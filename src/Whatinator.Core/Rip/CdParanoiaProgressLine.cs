@@ -35,6 +35,24 @@ internal static partial class CdParanoiaProgressLine
         return true;
     }
 
+    /// <summary>
+    /// Converts one <c>##:</c> line's <paramref name="wordOffset"/> -- which
+    /// cd-paranoia reports as an absolute disc-frame offset, not
+    /// track-relative, even though the requested read range is
+    /// track-relative (confirmed live against a real drive; see
+    /// <see cref="CdParanoiaProgressReporter.BeginRead"/> and root
+    /// <c>CLAUDE.md</c> § Gotchas) -- into a frame offset relative to
+    /// <paramref name="trackStartFrame"/>. Shared by
+    /// <see cref="CdParanoiaProgressReporter.Feed"/>'s live parse and
+    /// <see cref="CdParanoiaTrackReader.ComputeQuality"/>'s post-hoc parse so
+    /// the two conversions cannot diverge again.
+    /// </summary>
+    /// <param name="wordOffset">The line's parsed 16-bit-word offset, as returned by <see cref="TryParse"/>.</param>
+    /// <param name="trackStartFrame">The track's own absolute start frame, in the same disc-frame numbering as <paramref name="wordOffset"/>.</param>
+    /// <returns>The frame offset relative to the track's start.</returns>
+    internal static int ToTrackRelativeFrame(int wordOffset, int trackStartFrame) =>
+        (wordOffset / WordsPerFrame) - trackStartFrame;
+
     /// <summary>Matches a cd-paranoia <c>--stderr-progress</c> line, e.g. <c>##: 0 [read] @ 57624</c>.</summary>
     [GeneratedRegex(@"^##: (?<code>.+)\s\[(?<function>.*)\]\s@\s(?<offset>\d+)")]
     private static partial Regex ProgressLinePattern();

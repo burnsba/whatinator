@@ -125,6 +125,38 @@ public class CdParanoiaTrackReaderTests
     }
 
     [Fact]
+    public void ComputeQuality_ConvertsAbsoluteOffsetsToTrackRelative_ForNonZeroTrackStart()
+    {
+        // Mirrors a non-first track: cd-paranoia's "@ <wordOffset>" values are
+        // absolute disc frames, so every line here is offset by trackStartFrame
+        // (6835, as in the Glorilla track-2 case from the backlog item) and
+        // ComputeQuality must subtract it back out before comparing against the
+        // track-relative start/stop bounds, exactly as CdParanoiaProgressReporter.Feed
+        // does. Without that subtraction, the very first line's huge apparent
+        // forward jump saturates "reads" at frameCount and quality reads 1.0.
+        const int trackStartFrame = 6835;
+
+        // A clean forward+verify double pass over the whole 10-frame track.
+        var cleanPass = string.Join(
+            '\n',
+            Enumerable.Range(0, 10).Select(i => $"##: 0 [read] @ {(trackStartFrame + i + 1) * WordsPerFrame}"));
+
+        // A partial third pass re-reading frames 0-4 (a rewind, then forward
+        // progress that doesn't reach the end) -- representative of a real
+        // re-read that wastes reads without advancing "furthest read".
+        var partialRereadPass = string.Join(
+            '\n',
+            Enumerable.Range(0, 5).Select(i => $"##: 0 [read] @ {(trackStartFrame + i) * WordsPerFrame}"));
+
+        var captured = cleanPass + "\n" + cleanPass + "\n" + partialRereadPass;
+
+        var quality = CdParanoiaTrackReader.ComputeQuality(captured, 0, 9, trackStartFrame);
+
+        Assert.NotNull(quality);
+        Assert.True(quality < 1.0, $"expected quality below 1.0 for re-read input, got {quality}");
+    }
+
+    [Fact]
     public async Task RetryAsync_SucceedsImmediately_WhenFirstAttemptMatches()
     {
         var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, _ => Task.FromResult(true), CancellationToken.None);

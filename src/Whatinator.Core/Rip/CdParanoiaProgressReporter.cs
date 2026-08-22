@@ -108,7 +108,7 @@ internal sealed class CdParanoiaProgressReporter
 
         if ((function == "read" || function == "verify") && wordOffset % CdParanoiaProgressLine.WordsPerFrame == 0)
         {
-            var frame = (wordOffset / CdParanoiaProgressLine.WordsPerFrame) - _startFrame;
+            var frame = CdParanoiaProgressLine.ToTrackRelativeFrame(wordOffset, _startFrame);
             if (frame > _totalFrames)
             {
                 frame = _totalFrames;

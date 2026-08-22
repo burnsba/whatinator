@@ -1,6 +1,6 @@
 # ComputeQuality mixes absolute and track-relative frame offsets
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

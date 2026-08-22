@@ -177,8 +177,17 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     /// <param name="capturedStandardError">The read's captured raw stderr text.</param>
     /// <param name="start">The read's start offset within the track, in frames (always <c>0</c> for a whole-track read).</param>
     /// <param name="stop">The read's stop offset within the track, in frames, inclusive.</param>
+    /// <param name="trackStartFrame">
+    /// The track's own absolute start frame. cd-paranoia's <c>##: ... @ &lt;wordOffset&gt;</c> values are
+    /// absolute disc offsets, not track-relative (confirmed live against a real drive; see
+    /// <see cref="CdParanoiaProgressReporter.BeginRead"/> and root <c>CLAUDE.md</c> § Gotchas), so every
+    /// parsed offset must be converted to track-relative via <see cref="CdParanoiaProgressLine.ToTrackRelativeFrame"/>
+    /// before comparing against <paramref name="start"/>/<paramref name="stop"/>, exactly as
+    /// <see cref="CdParanoiaProgressReporter.Feed"/> does. Defaults to <c>0</c> for track 1, whose absolute
+    /// and track-relative offsets coincide.
+    /// </param>
     /// <returns>A quality fraction in <c>(0, 1]</c>, or <see langword="null"/> if no parseable progress lines were captured.</returns>
-    internal static double? ComputeQuality(string capturedStandardError, int start, int stop)
+    internal static double? ComputeQuality(string capturedStandardError, int start, int stop, int trackStartFrame = 0)
     {
         var read = start;
         var reads = 0;
@@ -195,7 +204,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
                 continue;
             }
 
-            var frameOffset = wordOffset / CdParanoiaProgressLine.WordsPerFrame;
+            var frameOffset = CdParanoiaProgressLine.ToTrackRelativeFrame(wordOffset, trackStartFrame);
 
             int markStart, markEnd;
             if (frameOffset > read)
@@ -400,7 +409,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             }
 
             var peak = await TryGetPeakLevelAsync(testPath, cancellationToken).ConfigureAwait(false);
-            var quality = ComputeQuality(testRun.CapturedStandardError, 0, stopOffset);
+            var quality = ComputeQuality(testRun.CapturedStandardError, 0, stopOffset, track.StartFrame);
 
             File.Move(testPath, destinationPath, overwrite: true);
             return (testCrc, peak, quality);
