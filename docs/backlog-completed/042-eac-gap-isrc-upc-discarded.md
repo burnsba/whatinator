@@ -1,6 +1,6 @@
 # EAC gap: ISRC and UPC are captured and then discarded
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

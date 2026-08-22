@@ -31,8 +31,14 @@ public static class IdTextFile
 
     /// <summary>Formats <paramref name="releaseInfo"/> as <c>id.txt</c> content.</summary>
     /// <param name="releaseInfo">The release to format.</param>
+    /// <param name="upc">
+    /// The disc's UPC/EAN catalogue number, from <see cref="Toc.DiscToc.CatalogNumber"/>,
+    /// or <see langword="null"/> if unknown -- a physical fact about the
+    /// pressing, kept as its own line distinct from <c>release:</c>'s
+    /// MusicBrainz/Discogs label catalog number.
+    /// </param>
     /// <returns>The formatted text, ready to write to a file.</returns>
-    public static string Format(ReleaseInfo releaseInfo)
+    public static string Format(ReleaseInfo releaseInfo, string? upc = null)
     {
         ArgumentNullException.ThrowIfNull(releaseInfo);
 
@@ -41,6 +47,7 @@ public static class IdTextFile
         text.Append("title: ").Append(releaseInfo.Title).Append('\n');
         text.Append("medium: cd").Append('\n');
         text.Append("release: ").Append(FormatRelease(releaseInfo)).Append('\n');
+        text.Append("upc: ").Append(upc ?? "-").Append('\n');
         text.Append("series: -").Append('\n');
         text.Append("format: ").Append(releaseInfo.Discogs?.Format ?? "-").Append('\n');
         text.Append("country: ").Append(releaseInfo.Country ?? "-").Append('\n');
@@ -65,7 +72,9 @@ public static class IdTextFile
     /// <summary>Formats <paramref name="releaseInfo"/> and writes it to <paramref name="path"/>.</summary>
     /// <param name="releaseInfo">The release to format.</param>
     /// <param name="path">The destination file path.</param>
-    public static void Write(ReleaseInfo releaseInfo, string path) => File.WriteAllText(path, Format(releaseInfo));
+    /// <param name="upc">The disc's UPC/EAN catalogue number -- see <see cref="Format"/>.</param>
+    public static void Write(ReleaseInfo releaseInfo, string path, string? upc = null) =>
+        File.WriteAllText(path, Format(releaseInfo, upc));
 
     /// <summary>Formats the <c>release:</c> line as <c>{label} - {catalogNumber}</c>, or <c>-</c> if both are unknown.</summary>
     /// <param name="releaseInfo">The release to read label/catalog number from.</param>

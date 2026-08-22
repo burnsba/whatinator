@@ -90,6 +90,12 @@ public static class WhatinatorEacLog
         text.Append($"Used drive  : {drive}   Device: {o.DevicePath}\n");
         text.Append('\n');
 
+        // The disc's own CATALOG line (UPC/EAN), from DiscToc -- distinct
+        // from any MusicBrainz label catalog number, which this log never
+        // prints (see root CLAUDE.md's ISRC/UPC gotcha).
+        text.Append($"Disc catalogue number (UPC/EAN)             : {o.Toc.CatalogNumber ?? "none"}\n");
+        text.Append('\n');
+
         // WhatinatorRipRunner (phase 015) always does the cd-paranoia
         // test+copy double-read cycle, EAC's own Burst/Secure distinction
         // boiling down to whether that verification happened -- so this is
@@ -154,7 +160,7 @@ public static class WhatinatorEacLog
         const string flacArgs =
             "--verify -o <output.flac> -T ARTIST=<artist> -T ALBUM=<album> -T TITLE=<title> " +
             "-T ALBUMARTIST=<albumartist> -T DATE=<year> -T TRACKNUMBER=<n> -T TRACKTOTAL=<total> " +
-            "-T GENRE=<genre> <input.wav>";
+            "-T ISRC=<isrc> -T GENRE=<genre> <input.wav>";
         AppendEncoderSetting(text, "Additional command line options", flacArgs);
     }
 
@@ -221,6 +227,12 @@ public static class WhatinatorEacLog
             {
                 text.Append('\n');
                 text.Append($"     Pre-gap length  {FormatHmsf(pregap)}\n");
+            }
+
+            if (tocTrack.Isrc is not null)
+            {
+                text.Append('\n');
+                text.Append($"     ISRC {tocTrack.Isrc}\n");
             }
 
             text.Append('\n');

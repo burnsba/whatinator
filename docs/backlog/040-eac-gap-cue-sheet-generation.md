@@ -23,6 +23,16 @@ indices, UPC, ISRC -- is data whatinator **already parses** and currently has
 nowhere to put (see the ISRC/UPC and pregap backlog items). The cue sheet is the
 artifact that gives all of it a home.
 
+## Status update (backlog 042)
+
+`DiscToc.CatalogNumber` (UPC) and per-track `DiscTocTrack.Isrc` are now threaded
+through to the rip log, FLAC tags, and `id.txt` (see
+`docs/backlog-completed/042-eac-gap-isrc-upc-discarded.md`) -- but that plumbing
+is per-call (`EacLogOptions`/`FlacEncodeOptions`/`FlacPackageOptions`), not a new
+persisted field on `ReleaseInfo`. A future cue-sheet writer should read
+`DiscToc` directly, the same way `WhatinatorEacLog` and `WhatinatorRipRunner`
+already do, rather than expecting UPC/ISRC to appear on `ReleaseInfo`.
+
 ## Dependencies
 
 - A gaps-accurate cue sheet requires per-track pregaps, which are currently never

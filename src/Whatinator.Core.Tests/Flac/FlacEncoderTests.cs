@@ -52,6 +52,7 @@ public class FlacEncoderTests : IDisposable
         Assert.Contains("TRACKNUMBER=1", args);
         Assert.Contains("TRACKTOTAL=10", args);
         Assert.Contains("GENRE=Rock", args);
+        Assert.Contains("ISRC=USRC17607839", args);
         Assert.Equal("in.wav", args[^1]);
     }
 
@@ -64,6 +65,16 @@ public class FlacEncoderTests : IDisposable
 
         Assert.DoesNotContain(args, a => a.StartsWith("DATE=", StringComparison.Ordinal));
         Assert.DoesNotContain(args, a => a.StartsWith("GENRE=", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildStartInfo_OmitsIsrc_WhenNull()
+    {
+        var options = CreateOptions() with { Isrc = null };
+
+        var args = FlacEncoder.BuildStartInfo(options).ArgumentList;
+
+        Assert.DoesNotContain(args, a => a.StartsWith("ISRC=", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -83,7 +94,8 @@ public class FlacEncoderTests : IDisposable
             Year: "1999",
             TrackNumber: 3,
             TrackCount: 10,
-            Genre: "Rock");
+            Genre: "Rock",
+            Isrc: "USRC17607839");
 
         var encoder = new FlacEncoder();
         using var stdout = new MemoryStream();
@@ -102,6 +114,7 @@ public class FlacEncoderTests : IDisposable
         Assert.Equal("Album Artist", tags["album_artist"]);
         Assert.Equal("Rock", tags["GENRE"]);
         Assert.Equal("3", tags["track"]);
+        Assert.Equal("USRC17607839", tags["ISRC"]);
     }
 
     private static Dictionary<string, string> ReadTags(string flacPath)
@@ -142,7 +155,8 @@ public class FlacEncoderTests : IDisposable
         Year: "1999",
         TrackNumber: 1,
         TrackCount: 10,
-        Genre: "Rock");
+        Genre: "Rock",
+        Isrc: "USRC17607839");
 
     private static void CreateSyntheticWav(string path)
     {

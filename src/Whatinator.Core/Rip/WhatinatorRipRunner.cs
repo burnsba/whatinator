@@ -142,7 +142,8 @@ public sealed class WhatinatorRipRunner
                 yearOrNull,
                 track.Number,
                 medium.Tracks.Count,
-                options.ReleaseInfo.Discogs?.Genre);
+                options.ReleaseInfo.Discogs?.Genre,
+                tocTrack.Isrc);
             var encodeResult = await _flacEncoder.EncodeAsync(encodeOptions, standardOutput, standardError, cancellationToken)
                 .ConfigureAwait(false);
             if (!encodeResult.Success)

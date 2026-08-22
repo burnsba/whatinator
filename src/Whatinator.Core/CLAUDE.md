@@ -97,6 +97,11 @@ rip log; `IdTextFile.Format` renders `id.txt`; `M3uPlaylist` the playlist;
 - **`CdParanoiaTrackReader.IsExpectedSize` is the size guard** for a read
   (`(EndFrame - StartFrame + 1) * 2352 + 44`). `OffsetFinder` reuses it; that's
   why it and `RunCdParanoiaAsync` are `internal` rather than `private`.
+- **Physical per-disc facts (ISRC, UPC) are threaded through options records,
+  not stored on `ReleaseInfo`.** `DiscToc.CatalogNumber`/`DiscTocTrack.Isrc`
+  flow straight into `FlacEncodeOptions.Isrc`, `EacLogOptions.Toc`, and
+  `FlacPackageOptions.DiscCatalogNumber` on each call -- see root `CLAUDE.md`
+  § Gotchas.
 
 ## Gotchas specific to this project
 

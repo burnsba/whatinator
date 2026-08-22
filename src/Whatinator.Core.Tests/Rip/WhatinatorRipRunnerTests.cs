@@ -51,6 +51,24 @@ public class WhatinatorRipRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RipAsync_PassesTocTrackIsrc_ToFlacEncodeOptions()
+    {
+        var toc = new DiscToc(
+        [
+            new DiscTocTrack(1, 0, 999, IsAudio: true, Isrc: "USRC17607839"),
+            new DiscTocTrack(2, 1000, 1999, IsAudio: true),
+        ]);
+        var releaseInfo = CreateReleaseInfo([1, 2]);
+        var encoder = new FakeFlacEncoder();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), new FakeCdParanoiaTrackReader(), encoder);
+
+        await RunAsync(runner, releaseInfo, toc);
+
+        Assert.Equal("USRC17607839", encoder.EncodedOptions[0].Isrc);
+        Assert.Null(encoder.EncodedOptions[1].Isrc);
+    }
+
+    [Fact]
     public async Task RipAsync_AnnouncesFlacConversion_BeforeEncodingEachTrack()
     {
         var toc = SingleAudioTrackToc;
@@ -292,6 +310,8 @@ public class WhatinatorRipRunnerTests : IDisposable
 
         public List<string> EncodedInputPaths { get; } = [];
 
+        public List<FlacEncodeOptions> EncodedOptions { get; } = [];
+
         public Task<FlacEncodeResult> EncodeAsync(
             FlacEncodeOptions options,
             Stream standardOutput,
@@ -299,6 +319,7 @@ public class WhatinatorRipRunnerTests : IDisposable
             CancellationToken cancellationToken = default)
         {
             EncodedInputPaths.Add(options.InputWavPath);
+            EncodedOptions.Add(options);
             if (_exitCode == 0)
             {
                 File.WriteAllText(options.OutputFlacPath, "fake flac bytes");

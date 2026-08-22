@@ -24,6 +24,7 @@ public class WhatinatorEacLogTests
         Assert.Contains("OS: Linux host\n", text, StringComparison.Ordinal);
         Assert.Contains("OS (pretty name): Debian GNU/Linux 13 (trixie)\n", text, StringComparison.Ordinal);
         Assert.Contains("Used drive  : ASUS DRW-24F1ST   b (revision 1.00)   Device: /dev/sr1\n", text, StringComparison.Ordinal);
+        Assert.Contains("Disc catalogue number (UPC/EAN)             : none\n", text, StringComparison.Ordinal);
         Assert.Contains("Read mode : Secure\n", text, StringComparison.Ordinal);
         Assert.Contains("Read offset correction                      : 6\n", text, StringComparison.Ordinal);
         Assert.Contains("Overread into Lead-In and Lead-Out          : No\n", text, StringComparison.Ordinal);
@@ -139,6 +140,36 @@ public class WhatinatorEacLogTests
         var text = WhatinatorEacLog.Format(options);
 
         Assert.DoesNotContain("Pre-gap length", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_IncludesCatalogNumber_WhenPresent()
+    {
+        var toc = new DiscToc([new DiscTocTrack(1, 150, 16627, IsAudio: true, PregapFrames: 150)], CatalogNumber: "602475160991");
+        var options = CreateOptions() with { Toc = toc };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("Disc catalogue number (UPC/EAN)             : 602475160991\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_IncludesIsrcLine_WhenTrackHasOne()
+    {
+        var toc = new DiscToc([new DiscTocTrack(1, 150, 16627, IsAudio: true, PregapFrames: 150, Isrc: "USRC17607839")]);
+        var options = CreateOptions() with { Toc = toc };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("     ISRC USRC17607839\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_OmitsIsrcLine_WhenTrackHasNone()
+    {
+        var text = WhatinatorEacLog.Format(CreateOptions());
+
+        Assert.DoesNotContain("ISRC ", text, StringComparison.Ordinal);
     }
 
     [Fact]

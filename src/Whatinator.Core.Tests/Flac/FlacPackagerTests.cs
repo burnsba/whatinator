@@ -53,6 +53,19 @@ public class FlacPackagerTests : IDisposable
     }
 
     [Fact]
+    public async Task PackageAsync_WritesUpcIntoIdTxt_WhenDiscCatalogNumberProvided()
+    {
+        CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");
+        var releaseInfo = CreateSingleDiscRelease(trackCount: 1);
+        var packager = new FlacPackager(new FakeCoverArtClient());
+
+        var result = await packager.PackageAsync(new FlacPackageOptions(releaseInfo, _sourceDir, _destDir, DiscCatalogNumber: "602475160991"));
+
+        var idText = File.ReadAllText(Path.Combine(result.ContainerDirectory, "id.txt"));
+        Assert.Contains("upc: 602475160991\n", idText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PackageAsync_PreservesLogContentByteForByte()
     {
         CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");

@@ -68,7 +68,7 @@ public sealed class FlacPackager
         var logFilePath = MoveLogFile(options.SourceDirectory, discDir);
 
         ReleaseInfoFile.Save(releaseInfo, Path.Combine(containerDir, "releaseinfo.json"));
-        IdTextFile.Write(releaseInfo, Path.Combine(containerDir, "id.txt"));
+        IdTextFile.Write(releaseInfo, Path.Combine(containerDir, "id.txt"), options.DiscCatalogNumber);
         WriteChecksums(containerDir);
         WritePlaylist(releaseInfo, containerDir, isMultiDisc);
 

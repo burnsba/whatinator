@@ -13,8 +13,15 @@ namespace Whatinator.Core.Flac;
 /// count) when the release has more than one disc; ignored (defaults to 1)
 /// for single-disc releases.
 /// </param>
+/// <param name="DiscCatalogNumber">
+/// This disc's UPC/EAN catalogue number, from <see cref="Toc.DiscToc.CatalogNumber"/>,
+/// or <see langword="null"/> if unknown -- written into <c>id.txt</c>'s
+/// <c>upc:</c> line. Named distinctly from <see cref="Whatinator.Core.Metadata.ReleaseInfo.CatalogNumber"/>,
+/// which is unrelated MusicBrainz/Discogs label data.
+/// </param>
 public sealed record FlacPackageOptions(
     ReleaseInfo ReleaseInfo,
     string SourceDirectory,
     string DestinationParentDirectory,
-    int? DiscNumber = null);
+    int? DiscNumber = null,
+    string? DiscCatalogNumber = null);

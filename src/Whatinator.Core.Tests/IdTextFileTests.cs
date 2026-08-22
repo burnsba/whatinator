@@ -100,6 +100,26 @@ public class IdTextFileTests
     }
 
     [Fact]
+    public void Format_IncludesUpc_WhenProvided()
+    {
+        var releaseInfo = CreateReleaseInfo();
+
+        var text = IdTextFile.Format(releaseInfo, upc: "602475160991");
+
+        Assert.Contains("upc: 602475160991\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_UsesDashForUpc_WhenAbsent()
+    {
+        var releaseInfo = CreateReleaseInfo();
+
+        var text = IdTextFile.Format(releaseInfo);
+
+        Assert.Contains("upc: -\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Format_SingleDisc_HasNoDiscHeaderLine()
     {
         var releaseInfo = CreateReleaseInfo();

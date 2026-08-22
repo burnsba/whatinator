@@ -11,6 +11,10 @@ namespace Whatinator.Core.Flac;
 /// <param name="TrackNumber">The 1-based track number (<c>-T TRACKNUMBER=</c>).</param>
 /// <param name="TrackCount">The disc's total track count (<c>-T TRACKTOTAL=</c>).</param>
 /// <param name="Genre">The genre (<c>-T GENRE=</c>), or <see langword="null"/> if unknown.</param>
+/// <param name="Isrc">
+/// This track's ISRC (<c>-T ISRC=</c>), from <see cref="Whatinator.Core.Toc.DiscTocTrack.Isrc"/>,
+/// or <see langword="null"/> if the disc's TOC carried none for this track.
+/// </param>
 public sealed record FlacEncodeOptions(
     string InputWavPath,
     string OutputFlacPath,
@@ -21,4 +25,5 @@ public sealed record FlacEncodeOptions(
     string? Year,
     int TrackNumber,
     int TrackCount,
-    string? Genre);
+    string? Genre,
+    string? Isrc = null);

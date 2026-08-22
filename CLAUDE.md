@@ -237,6 +237,19 @@ artifact solely from the disc currently being packaged.
 Corollary: a degraded disc still contributes its present tracks to the `.m3u`
 rather than being omitted until complete.
 
+### ISRC/UPC are physical facts, threaded per call, not stored on `ReleaseInfo`
+
+`DiscToc.CatalogNumber` (UPC/EAN) and `DiscTocTrack.Isrc` reach the rip log
+(`WhatinatorEacLog`), FLAC tags (`FlacEncodeOptions.Isrc`), and `id.txt`'s
+`upc:` line (`IdTextFile.Format`'s `upc` parameter, threaded through
+`FlacPackageOptions.DiscCatalogNumber`) directly from the disc's `DiscToc` on
+each call -- they are **not** added to `ReleaseInfo`/`releaseinfo.json`.
+That file is purely MusicBrainz/Discogs editorial data (see "the two disc
+models" above), and adding a per-disc physical fact to it would violate the
+"packaging is idempotent by rescan" invariant just above: a multi-disc
+release only ever has one `ReleaseInfo` object, so there'd be no correct
+single value to store there for a fact that's read per physical disc.
+
 ### The rip log is moved, the MP3 log is regenerated
 
 `FlacPackager` moves the `.log` `WhatinatorRipRunner` wrote **byte for byte,

@@ -132,7 +132,7 @@ public sealed class PipelineRunner
         if (!options.SkipFlacPackaging)
         {
             flacResult = await _flacPackager
-                .PackageAsync(new FlacPackageOptions(options.ReleaseInfo, rawDir, options.DestinationParentDirectory, discNumber))
+                .PackageAsync(new FlacPackageOptions(options.ReleaseInfo, rawDir, options.DestinationParentDirectory, discNumber, toc.CatalogNumber))
                 .ConfigureAwait(false);
         }
 

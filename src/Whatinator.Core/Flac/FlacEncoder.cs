@@ -78,6 +78,12 @@ public sealed class FlacEncoder : IFlacEncoder
         args.Add("-T");
         args.Add($"TRACKTOTAL={options.TrackCount}");
 
+        if (options.Isrc is not null)
+        {
+            args.Add("-T");
+            args.Add($"ISRC={options.Isrc}");
+        }
+
         if (options.Genre is not null)
         {
             args.Add("-T");
