@@ -13,8 +13,8 @@ The packagers write a manifest containing **only** the audio files:
 var files = Directory.EnumerateFiles(containerDir, "*.flac", SearchOption.AllDirectories)
 ```
 
-This matches `init.md`'s stated spec ("The flac folder should only create
-checksums for flac files").
+This matches `init.md`'s previously stated spec ("The flac folder should only create
+checksums for flac files"). `init.md` has since been removed.
 
 But `ChecksumFile.Compare` enumerates the folder **recursively** and reports
 everything not listed as `Extra`, and `ChecksumCompareResult.IsClean` requires
