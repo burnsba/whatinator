@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Whatinator.Cli/Whatinator.Cli.csproj" />
+    <Project Path="src/Whatinator.Core.Tests/Whatinator.Core.Tests.csproj" />
+    <Project Path="src/Whatinator.Core/Whatinator.Core.csproj" />
+    <Project Path="src/Whatinator.LibDiscId.Tests/Whatinator.LibDiscId.Tests.csproj" />
+    <Project Path="src/Whatinator.LibDiscId/Whatinator.LibDiscId.csproj" />
+  </Folder>
+</Solution>

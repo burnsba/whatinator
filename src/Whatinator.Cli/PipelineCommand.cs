@@ -1,0 +1,240 @@
+using System.Text.Json;
+using Whatinator.Core;
+using Whatinator.Core.AccurateRip;
+using Whatinator.Core.CoverArt;
+using Whatinator.Core.Drive;
+using Whatinator.Core.Metadata;
+using Whatinator.Core.Rip;
+
+namespace Whatinator.Cli;
+
+/// <summary>
+/// Implements the <c>pipeline</c> command: the full rip → FLAC-packaging →
+/// MP3 pipeline in one invocation, looping over every disc of a multi-disc
+/// release and prompting between physical disc swaps. This is the
+/// "just rip the whole release" entry point -- it resolves metadata itself
+/// (MusicBrainz/Discogs, or <c>--releaseinfo</c> to skip that), then for
+/// each disc in range runs the same rip step <c>RipCommand</c> exposes
+/// standalone, followed by <c>FlacPackager</c>/<c>Mp3Packager</c>. Reach for
+/// the standalone <c>rip</c>/<c>flac</c>/<c>mp3</c> commands instead only
+/// when you want to run one stage in isolation (e.g. re-ripping a single
+/// disc without re-resolving metadata).
+/// </summary>
+internal static class PipelineCommand
+{
+    /// <summary>The <c>User-Agent</c> sent with every MusicBrainz/Discogs/Cover Art Archive request.</summary>
+    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
+
+    /// <summary>Resolves a release, then rips/packages every disc in range.</summary>
+    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs/Cover Art Archive/AccurateRip <see cref="HttpClient"/>s from.</param>
+    /// <returns>The process exit code.</returns>
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    {
+        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
+        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, httpClientFactory).ConfigureAwait(false);
+        if (releaseInfo is null)
+        {
+            return 1;
+        }
+
+        int startDisc, endDisc;
+        try
+        {
+            (startDisc, endDisc) = ResolveDiscRange(args, releaseInfo);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 1;
+        }
+
+        var config = ConfigLoader.Load();
+        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var noFlac = CommandLineOptions.HasFlag(args, "--no-flac");
+        var createMp3 = !CommandLineOptions.HasFlag(args, "--no-mp3") && config.MakeMp3;
+        var keepWav = CommandLineOptions.HasFlag(args, "--keep-wav");
+        var isMultiDisc = releaseInfo.Media.Count > 1;
+        var drive = OpticalDriveLocator.Enumerate().FirstOrDefault(d => d.DevicePath == device);
+        var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
+        var environment = RipEnvironmentResolver.Resolve(config, drive);
+
+        var coverArtClient = new CoverArtClient(UserAgent, httpClientFactory.CreateClient("coverart"));
+        var accurateRipClient = new AccurateRipClient(UserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var pipelineRunner = new PipelineRunner(coverArtClient, accurateRipClient);
+
+        // Deliberately not disposed: these wrap the process's real stdout/stderr,
+        // which Console.Write* below still needs to use (same pattern as `rip`/`mp3`).
+        var standardOutput = Console.OpenStandardOutput();
+        var standardError = Console.OpenStandardError();
+
+        // Printed once, after MusicBrainz/Discogs selection (ResolveReleaseInfoAsync,
+        // above) and before the per-disc loop's own TOC read -- everything on
+        // either side of this one line is deliberately not timestamped; see
+        // root CLAUDE.md § Gotchas.
+        Console.WriteLine($"{RipOutputTimestamp.Prefix()}starting: pipeline {string.Join(' ', args)}");
+
+        for (var discNumber = startDisc; discNumber <= endDisc; discNumber++)
+        {
+            if (isMultiDisc && discNumber > startDisc)
+            {
+                Console.WriteLine();
+                Console.Write($"Insert disc {discNumber} of {releaseInfo.Media.Count} and press Enter...");
+                if (Console.ReadLine() is null)
+                {
+                    Console.Error.WriteLine();
+                    Console.Error.WriteLine("Stdin closed before disc swap was confirmed; aborting.");
+                    return 1;
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(isMultiDisc ? $"=== Disc {discNumber} of {releaseInfo.Media.Count} ===" : "=== Ripping ===");
+
+            PipelineDiscResult result;
+            try
+            {
+                result = await pipelineRunner.RunDiscAsync(
+                    new PipelineDiscOptions(
+                        releaseInfo,
+                        isMultiDisc ? discNumber : null,
+                        device,
+                        dest,
+                        noFlac,
+                        createMp3,
+                        readOffset,
+                        KeepWav: keepWav,
+                        Environment: environment),
+                    standardOutput,
+                    standardError).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DirectoryNotFoundException)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+
+            if (!ReportDiscResult(discNumber, result, noFlac))
+            {
+                return 1;
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Pipeline complete: {releaseInfo.Artist} - {releaseInfo.Title}");
+        return 0;
+    }
+
+    /// <summary>Loads <c>--releaseinfo</c>, or resolves it from the disc in the drive (same as <c>make-releaseinfo</c>), and always writes a copy to <paramref name="dest"/>.</summary>
+    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="dest">Where to write the resolved <c>releaseinfo.json</c>.</param>
+    /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
+    /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
+    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, IHttpClientFactory httpClientFactory)
+    {
+        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
+
+        ReleaseInfo releaseInfo;
+        if (releaseInfoPath is not null)
+        {
+            try
+            {
+                releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
+            }
+            catch (Exception ex) when (ex is IOException or JsonException)
+            {
+                Console.Error.WriteLine($"Failed to read {releaseInfoPath}: {ex.Message}");
+                return null;
+            }
+        }
+        else
+        {
+            var resolved = await MakeReleaseInfoCommand.LookUpFromDiscAsync(args, httpClientFactory).ConfigureAwait(false);
+            if (resolved is null)
+            {
+                return null;
+            }
+
+            releaseInfo = resolved;
+        }
+
+        Directory.CreateDirectory(dest);
+        ReleaseInfoFile.Save(releaseInfo, Path.Combine(dest, "releaseinfo.json"));
+        return releaseInfo;
+    }
+
+    /// <summary>Resolves the inclusive disc range this invocation covers.</summary>
+    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="releaseInfo">The resolved release.</param>
+    /// <returns>The 1-based (start, end) disc numbers, inclusive.</returns>
+    /// <exception cref="ArgumentException"><c>--multi</c> is malformed or out of range for <paramref name="releaseInfo"/>.</exception>
+    private static (int Start, int End) ResolveDiscRange(string[] args, ReleaseInfo releaseInfo)
+    {
+        var multiArg = CommandLineOptions.GetValue(args, "--multi");
+        if (multiArg is null)
+        {
+            return (1, releaseInfo.Media.Count);
+        }
+
+        var parts = multiArg.Split('-', 2);
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var start) || !int.TryParse(parts[1], out var end))
+        {
+            throw new ArgumentException($"--multi must be '<start>-<end>' (e.g. 1-3), got '{multiArg}'.");
+        }
+
+        if (start < 1 || end < start || end > releaseInfo.Media.Count)
+        {
+            throw new ArgumentException(
+                $"--multi {multiArg} is out of range for '{releaseInfo.Title}' ({releaseInfo.Media.Count} disc(s)).");
+        }
+
+        return (start, end);
+    }
+
+    /// <summary>Prints one disc's outcome and decides whether the pipeline should continue.</summary>
+    /// <param name="discNumber">The disc just processed.</param>
+    /// <param name="result">Its pipeline result.</param>
+    /// <param name="noFlac">Whether <c>--no-flac</c> was given (changes how the raw rip directory is reported).</param>
+    /// <returns><see langword="false"/> if the pipeline should abort (a hard rip failure -- already printed).</returns>
+    private static bool ReportDiscResult(int discNumber, PipelineDiscResult result, bool noFlac)
+    {
+        if (!result.RipResult.Success && !result.RipResult.Degraded)
+        {
+            Console.Error.WriteLine($"No audio tracks were ripped from disc {discNumber}; aborting.");
+            return false;
+        }
+
+        if (result.RipResult.Degraded)
+        {
+            var skipped = result.RipResult.Tracks.Count(t => t.Degraded);
+            Console.WriteLine(
+                $"Warning: {skipped} of {result.RipResult.Tracks.Count} track(s) on disc {discNumber} could not be " +
+                "read after retries -- continuing with whatever was captured.");
+        }
+        else if (result.RipResult.AccurateRipFound)
+        {
+            var matched = result.RipResult.Tracks.Count(t => t.AccurateRip?.IsMatch == true);
+            Console.WriteLine($"AccurateRip: {matched} of {result.RipResult.Tracks.Count} track(s) on disc {discNumber} matched the database.");
+        }
+        else
+        {
+            Console.WriteLine($"AccurateRip: no database match for disc {discNumber}.");
+        }
+
+        if (result.FlacResult is not null)
+        {
+            Console.WriteLine($"FLAC: {result.FlacResult.MovedFlacFileCount} track(s) -> {result.FlacResult.DiscDirectory}");
+        }
+        else if (noFlac)
+        {
+            Console.WriteLine($"Raw rip (FLAC, unorganized) kept at: {result.RawRipDirectory}");
+        }
+
+        if (result.Mp3Result is not null)
+        {
+            Console.WriteLine($"MP3: {result.Mp3Result.EncodedTrackCount} track(s) -> {result.Mp3Result.DiscDirectory}");
+        }
+
+        return true;
+    }
+}

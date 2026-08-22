@@ -1,0 +1,85 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+[*.{json,yml,yaml,props,targets,csproj,sln}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# StyleCop.Analyzers rules explicitly disabled per project decision (see init.md):
+[*.cs]
+# SA1101: prefix local calls with 'this' -- not the project's style.
+dotnet_diagnostic.SA1101.severity = none
+# SA1633: file must have a header -- not used on this project.
+dotnet_diagnostic.SA1633.severity = none
+# SA1309: field names must not begin with underscore -- project uses _camelCase
+# for private fields.
+dotnet_diagnostic.SA1309.severity = none
+# SA1200: using directives must be placed inside namespace -- project keeps
+# usings outside the namespace (top of file).
+dotnet_diagnostic.SA1200.severity = none
+# SA1623: property summary text must match a fixed "Gets/Sets ..." template --
+# too rigid for this project's doc-comment style.
+dotnet_diagnostic.SA1623.severity = none
+# SA1313 predates C# 9 positional records: it flags a record's positional
+# parameters (e.g. `record Track(int Number, ...)`) for using PascalCase,
+# but those parameter names *are* the generated public property names, so
+# PascalCase is correct there. Not one of init.md's originally-listed
+# exceptions, but a necessary one for using records at all -- see root
+# CLAUDE.md.
+dotnet_diagnostic.SA1313.severity = none
+# SA1000 doesn't understand target-typed `new()` (e.g. `= new()` for a field
+# whose type is already declared, or `new(a, b)` constructing a record from
+# its declared return type) -- it wants a space between `new` and the next
+# token, which reads worse for these forms than the two spellings StyleCop
+# does accept (`new ()` or spelling out the full type name every time).
+# Same category of C#-version/StyleCop-version mismatch as SA1313.
+dotnet_diagnostic.SA1000.severity = none
+# SA1204 wants static members declared before instance members. This
+# project instead orders public API before private implementation details
+# (constructor, public methods, then private helpers, static or not) since
+# that reads better top-to-bottom for a caller skimming a file.
+dotnet_diagnostic.SA1204.severity = none
+# SA1010 doesn't understand C# 12 collection expressions (`[]`, `[a, b]`):
+# it flags the `[` as a "should not be preceded by a space" violation
+# whenever it follows a colon, comma, or other token with a conventional
+# trailing space (e.g. `candidates: []`). Same category of C#-version/
+# StyleCop-version mismatch as SA1313/SA1000.
+dotnet_diagnostic.SA1010.severity = none
+# SA1011 and SA1018 actively contradict each other on a nullable array type
+# (`byte[]?`, introduced by C# 8 nullable reference types): SA1011 wants a
+# space between `]` and `?`, SA1018 wants no space there -- satisfying one
+# always triggers the other (a known StyleCopAnalyzers gap for this pinned
+# 1.1.118 version, same category as SA1313/SA1000/SA1010). First hit by
+# phase 017's OffsetFinder single-read primitive
+# (`Task<byte[]?> SingleTrackReadDelegate`), which needed the array itself
+# (not just a wrapper) to be nullable to mean "this candidate offset's read
+# failed".
+dotnet_diagnostic.SA1011.severity = none
+dotnet_diagnostic.SA1018.severity = none
+# SA1009 flags the space between a positional record's parameter-list `)`
+# and the ` : BaseRecord` that follows it (e.g. `record Foo(string X) :
+# Bar;`) -- record inheritance from another positional record (C# 10) reads
+# worse without that space, and every other base-list-with-parentheses
+# construct in this codebase (a method call cast, an empty argument list)
+# already wants the space kept. Same category of C#-version/StyleCop-version
+# mismatch as SA1313/SA1000/SA1010/SA1011/SA1018 -- first hit by
+# HelpFormatter.cs's `HelpBlock` hierarchy.
+dotnet_diagnostic.SA1009.severity = none
+# SA1118 ("parameter spans multiple lines") misfires on a multi-parameter
+# call where one argument is a C# 12 collection expression (`[...]`) spread
+# across several lines -- the collection-expression-heavy, data-as-code
+# style HelpContent.cs uses (nested `new HelpCommand([...], [...])` calls)
+# triggers this on nearly every entry despite being properly formatted.
+# Same category of C#-version/StyleCop-version mismatch as SA1010.
+dotnet_diagnostic.SA1118.severity = none

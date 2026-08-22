@@ -1,0 +1,243 @@
+using System.Buffers.Binary;
+using Whatinator.Core.Toc;
+
+namespace Whatinator.Core.AccurateRip;
+
+/// <summary>A thin client for the AccurateRip database.</summary>
+/// <remarks>
+/// Best-effort by design, same contract as this project's MusicBrainz/
+/// Discogs/Cover-Art clients: a 404 or network failure just means "not in
+/// the database" -- never an exception. Confirmed live: the database is a
+/// flat, unauthenticated HTTP GET (plain <c>http</c>, not <c>https</c> --
+/// confirmed, not a typo) returning a binary, possibly multi-entry response.
+/// Implements both <see cref="IAccurateRipClient"/> (the whole-disc match
+/// used by <see cref="Rip.WhatinatorRipRunner"/>) and
+/// <see cref="IAccurateRipEntryLookup"/> (the raw per-entry data used by
+/// <see cref="Drive.OffsetFinder"/>) -- one HTTP fetch/parse path
+/// (<see cref="FetchEntriesAsync"/>) backs both.
+/// </remarks>
+public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLookup
+{
+    /// <summary>The base URL for the AccurateRip database.</summary>
+    private const string BaseUrl = "http://www.accuraterip.com/accuraterip/";
+
+    private readonly HttpClient _httpClient;
+
+    /// <summary>Initializes a new instance of the <see cref="AccurateRipClient"/> class.</summary>
+    /// <param name="userAgent">The <c>User-Agent</c> header value sent with every request.</param>
+    /// <param name="httpClient">
+    /// The <see cref="HttpClient"/> to issue requests with -- owned by the
+    /// caller (typically resolved from a shared <c>IHttpClientFactory</c>),
+    /// not disposed by this class. Tests pass <c>new HttpClient(stubHandler)</c>
+    /// instead of hitting the real network.
+    /// </param>
+    public AccurateRipClient(string userAgent, HttpClient httpClient)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userAgent);
+        ArgumentNullException.ThrowIfNull(httpClient);
+
+        _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri(BaseUrl);
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+    }
+
+    /// <inheritdoc/>
+    public async Task<AccurateRipMatchResult> MatchAsync(
+        DiscToc toc,
+        IReadOnlyList<(uint V1, uint V2)> computedChecksums,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(toc);
+        ArgumentNullException.ThrowIfNull(computedChecksums);
+
+        var audioTracks = toc.Tracks.Where(t => t.IsAudio).ToList();
+        if (audioTracks.Count != computedChecksums.Count)
+        {
+            throw new ArgumentException(
+                $"Expected {audioTracks.Count} computed checksums (one per audio track), got {computedChecksums.Count}.",
+                nameof(computedChecksums));
+        }
+
+        var entries = await FetchEntriesAsync(toc, cancellationToken).ConfigureAwait(false);
+        if (entries.Count == 0)
+        {
+            return NotFoundResult(audioTracks, computedChecksums);
+        }
+
+        var tracks = new List<AccurateRipTrackMatch>(audioTracks.Count);
+        for (var i = 0; i < audioTracks.Count; i++)
+        {
+            tracks.Add(MatchTrack(audioTracks[i].TrackNumber, computedChecksums[i], i, audioTracks.Count, entries));
+        }
+
+        return new AccurateRipMatchResult { Found = true, Tracks = tracks };
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<AccurateRipDbEntry>> GetEntriesAsync(DiscToc toc, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(toc);
+
+        return await FetchEntriesAsync(toc, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Fetches and parses a disc's raw AccurateRip database entries -- the shared body of <see cref="MatchAsync"/> and <see cref="GetEntriesAsync"/>.</summary>
+    /// <param name="toc">The disc's table of contents.</param>
+    /// <param name="cancellationToken">A token to cancel the request.</param>
+    /// <returns>Every parsed entry, or an empty list on a 404/network failure/empty response.</returns>
+    private async Task<List<AccurateRipDbEntry>> FetchEntriesAsync(DiscToc toc, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _httpClient.GetAsync(BuildPath(toc), cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return [];
+            }
+
+            var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            return ParseEntries(body);
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Matches one track's computed checksums against every database entry's value at its position.</summary>
+    /// <param name="trackNumber">The track's 1-based disc position.</param>
+    /// <param name="computed">The track's locally computed v1/v2 checksums.</param>
+    /// <param name="index">The track's 0-based position among audio tracks -- how database entries index their per-track arrays.</param>
+    /// <param name="audioTrackCount">The disc's total audio track count, used to skip malformed/mismatched entries.</param>
+    /// <param name="entries">Every entry parsed from the database response.</param>
+    private static AccurateRipTrackMatch MatchTrack(
+        int trackNumber,
+        (uint V1, uint V2) computed,
+        int index,
+        int audioTrackCount,
+        List<AccurateRipDbEntry> entries)
+    {
+        byte? maxConfidence = null;
+        string? maxConfidenceCrc = null;
+        byte? confidenceV1 = null;
+        string? crcV1 = null;
+        byte? confidenceV2 = null;
+        string? crcV2 = null;
+
+        foreach (var entry in entries)
+        {
+            if (entry.Checksums.Length != audioTrackCount)
+            {
+                continue;
+            }
+
+            var confidence = entry.Confidences[index];
+            var crc = entry.Checksums[index];
+            var crcHex = crc.ToString("x8");
+
+            if (maxConfidence is null || confidence > maxConfidence)
+            {
+                maxConfidence = confidence;
+                maxConfidenceCrc = crcHex;
+            }
+
+            if (crc == computed.V1 && (confidenceV1 is null || confidence > confidenceV1))
+            {
+                confidenceV1 = confidence;
+                crcV1 = crcHex;
+            }
+
+            if (crc == computed.V2 && (confidenceV2 is null || confidence > confidenceV2))
+            {
+                confidenceV2 = confidence;
+                crcV2 = crcHex;
+            }
+        }
+
+        return new AccurateRipTrackMatch
+        {
+            TrackNumber = trackNumber,
+            ComputedV1 = computed.V1,
+            ComputedV2 = computed.V2,
+            MatchedCrcV1 = crcV1,
+            ConfidenceV1 = confidenceV1,
+            MatchedCrcV2 = crcV2,
+            ConfidenceV2 = confidenceV2,
+            MaxConfidence = maxConfidence,
+            MaxConfidenceCrc = maxConfidenceCrc,
+        };
+    }
+
+    /// <summary>Builds a "not found" result -- every track carries its computed checksums but no database data.</summary>
+    /// <param name="audioTracks">The disc's audio tracks.</param>
+    /// <param name="computedChecksums">One (v1, v2) checksum pair per audio track, in track order.</param>
+    private static AccurateRipMatchResult NotFoundResult(
+        IReadOnlyList<DiscTocTrack> audioTracks,
+        IReadOnlyList<(uint V1, uint V2)> computedChecksums)
+    {
+        var tracks = new List<AccurateRipTrackMatch>(audioTracks.Count);
+        for (var i = 0; i < audioTracks.Count; i++)
+        {
+            tracks.Add(new AccurateRipTrackMatch
+            {
+                TrackNumber = audioTracks[i].TrackNumber,
+                ComputedV1 = computedChecksums[i].V1,
+                ComputedV2 = computedChecksums[i].V2,
+            });
+        }
+
+        return new AccurateRipMatchResult { Found = false, Tracks = tracks };
+    }
+
+    /// <summary>
+    /// Builds an AccurateRip lookup path from a disc's computed disc IDs --
+    /// ported from prior research into this exact URL scheme (see root
+    /// <c>CLAUDE.md</c> § Gotchas).
+    /// </summary>
+    /// <param name="toc">The disc's table of contents.</param>
+    private static string BuildPath(DiscToc toc)
+    {
+        var (discId1, discId2) = AccurateRipDiscId.Compute(toc);
+        var cddbId = CddbDiscId.Compute(toc);
+        var audioTrackCount = toc.Tracks.Count(t => t.IsAudio);
+        return $"{discId1[^1]}/{discId1[^2]}/{discId1[^3]}/dBAR-{audioTrackCount:D3}-{discId1}-{discId2}-{cddbId}.bin";
+    }
+
+    /// <summary>
+    /// Splits a raw AccurateRip response into its (possibly multiple)
+    /// fixed-format entries -- ported from prior research into this exact
+    /// binary format (see root <c>CLAUDE.md</c> § Gotchas). A response entry that claims
+    /// more bytes than remain in the buffer is dropped rather than throwing
+    /// -- this is untrusted external data.
+    /// </summary>
+    /// <param name="raw">The raw response body.</param>
+    private static List<AccurateRipDbEntry> ParseEntries(byte[] raw)
+    {
+        var entries = new List<AccurateRipDbEntry>();
+        var offset = 0;
+        while (offset < raw.Length)
+        {
+            var trackCount = raw[offset];
+            var entryLength = 1 + 12 + (trackCount * 9);
+            if (offset + entryLength > raw.Length)
+            {
+                break;
+            }
+
+            var confidences = new byte[trackCount];
+            var checksums = new uint[trackCount];
+            var pos = offset + 13;
+            for (var t = 0; t < trackCount; t++)
+            {
+                confidences[t] = raw[pos];
+                checksums[t] = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(pos + 1, 4));
+                pos += 9;
+            }
+
+            entries.Add(new AccurateRipDbEntry(confidences, checksums));
+            offset += entryLength;
+        }
+
+        return entries;
+    }
+}

@@ -1,0 +1,12 @@
+artist: Glorilla
+title: Glorious
+medium: cd
+release: Interscope Records - 602475160991
+series: -
+format: CD, Album
+country: US
+released: Oct 11, 2024
+genre: Hip Hop
+style: Hip Hop
+
+https://www.discogs.com/release/32013623-Glorilla-Glorious

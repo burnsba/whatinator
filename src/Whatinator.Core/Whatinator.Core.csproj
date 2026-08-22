@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Whatinator.LibDiscId\Whatinator.LibDiscId.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CRC32 for phase 014's cd-paranoia track runner (Test/Copy CRC) -
+         added here alongside this phase's AccurateRip primitives since both
+         live under Whatinator.Core.AccurateRip. No source file in this
+         phase uses it directly; System.IO.Hashing.Crc32 is referenced
+         straight from callers. -->
+    <PackageReference Include="System.IO.Hashing" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets Whatinator.Core.Tests exercise internal members directly (e.g.
+         FlacEncoder.BuildStartInfo) without spawning real subprocesses. -->
+    <InternalsVisibleTo Include="Whatinator.Core.Tests" />
+  </ItemGroup>
+
+</Project>

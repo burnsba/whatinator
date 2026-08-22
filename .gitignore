@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+out/
+
+# IDE / tooling
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS cruft
+.DS_Store
+
+# Rip working artifacts -- actual rips live under a dest folder the user
+# names per-release, but guard against scratch files landing at repo root.
+/*.wav
+/*.flac
+/*.mp3
