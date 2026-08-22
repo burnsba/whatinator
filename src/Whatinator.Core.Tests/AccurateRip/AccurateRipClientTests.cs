@@ -153,6 +153,46 @@ public class AccurateRipClientTests
     }
 
     [Fact]
+    public async Task MatchAsync_RealTrack1TrimAsymmetryFixture_ConfirmsLeadingTrimIsCorrect()
+    {
+        // Captured live on 2026-08-22 against a real 9-track disc in
+        // /dev/sr1, while investigating
+        // docs/backlog-completed/002-accuraterip-track-1-trim-asymmetry.md
+        // (the backlog item's "counter-evidence" scenario, now confirmed:
+        // the leading trim excludes one fewer sample than the trailing
+        // trim, but that's correct, not a bug -- see the doc comment on
+        // AccurateRipChecksum.Compute). Track 1's checksum below was
+        // computed by that exact method from a real cd-paranoia rip at the
+        // drive's confirmed +6-sample offset. Independently, running the
+        // CLI's offset-find against the same disc confirmed all 8 non-last
+        // tracks (track 1 included) against this same live database
+        // response -- this test isolates just the track-1/fixture-parsing
+        // half of that as a fast, offline regression check.
+        var toc = RealNineTrackDiscToc();
+        var (discId1, discId2) = AccurateRipDiscId.Compute(toc);
+        Assert.Equal("001326da", discId1);
+        Assert.Equal("008badbd", discId2);
+        Assert.Equal("630d2d09", CddbDiscId.Compute(toc));
+
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "AccurateRip", "Fixtures", "dBAR-009-001326da-008badbd-630d2d09.bin");
+        var response = await File.ReadAllBytesAsync(fixturePath);
+        var client = CreateClient(BinaryResponseHandler(response));
+
+        var computedChecksums = new List<(uint V1, uint V2)> { (0x441b6d23u, 0xabfe3e16u) };
+        computedChecksums.AddRange(Enumerable.Repeat((0u, 0u), toc.Tracks.Count - 1));
+
+        var result = await client.MatchAsync(toc, computedChecksums);
+
+        Assert.True(result.Found);
+        var track1 = result.Tracks[0];
+        Assert.True(track1.IsMatch);
+        Assert.Equal("441b6d23", track1.MatchedCrcV1);
+        Assert.Equal((byte)15, track1.ConfidenceV1);
+        Assert.Equal("abfe3e16", track1.MatchedCrcV2);
+        Assert.Equal((byte)26, track1.ConfidenceV2);
+    }
+
+    [Fact]
     public async Task GetEntriesAsync_ReturnsEmpty_On404()
     {
         var client = CreateClient(new StubHttpMessageHandler(HttpStatusCode.NotFound, string.Empty));
@@ -214,6 +254,24 @@ public class AccurateRipClientTests
 
         return new DiscToc(discTocTracks);
     }
+
+    /// <summary>
+    /// The real 9-track TOC backing <c>Fixtures/dBAR-009-...bin</c>, read
+    /// via a full (non-fast) <c>cdrdao read-toc</c> against a real disc in
+    /// <c>/dev/sr1</c> on 2026-08-22.
+    /// </summary>
+    private static DiscToc RealNineTrackDiscToc() => new(
+    [
+        new DiscTocTrack(1, 0, 38469, IsAudio: true),
+        new DiscTocTrack(2, 38470, 69856, IsAudio: true),
+        new DiscTocTrack(3, 69857, 83453, IsAudio: true),
+        new DiscTocTrack(4, 83454, 100421, IsAudio: true),
+        new DiscTocTrack(5, 100422, 118719, IsAudio: true),
+        new DiscTocTrack(6, 118720, 168619, IsAudio: true),
+        new DiscTocTrack(7, 168620, 194389, IsAudio: true),
+        new DiscTocTrack(8, 194390, 228206, IsAudio: true),
+        new DiscTocTrack(9, 228207, 252989, IsAudio: true),
+    ]);
 
     private static AccurateRipClient CreateClient(HttpMessageHandler handler) =>
         new("whatinator-tests/1.0 ( test@example.com )", new HttpClient(handler));

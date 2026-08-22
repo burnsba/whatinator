@@ -15,7 +15,7 @@ public class Mp3LogFileTests
             EndTime: new DateTimeOffset(2026, 8, 16, 9, 5, 30, TimeSpan.Zero));
 
         var expected =
-            "whatinator V1.0.3 EAC-style extraction log\n" +
+            $"whatinator V{WhatinatorVersion.Current} EAC-style extraction log\n" +
             "\n" +
             "whatinator extraction logfile from 16. August 2026, 09:00\n" +
             "\n" +

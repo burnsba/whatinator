@@ -20,9 +20,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- A real AccurateRip database response, captured live against a real
-         disc during phase 012's hands-on demo - see AccurateRipClientTests. -->
+    <!-- Real AccurateRip database responses, captured live against real
+         discs - see AccurateRipClientTests and AccurateRipChecksumTests. -->
     <None Include="AccurateRip\Fixtures\*.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- A real 15-second clip from the start of a real disc's track 1,
+         lossless-compressed - see
+         AccurateRipChecksumTests.Compute_RealTrack1Clip_MatchesIndependentlyVerifiedChecksum. -->
+    <None Include="AccurateRip\Fixtures\*.flac">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

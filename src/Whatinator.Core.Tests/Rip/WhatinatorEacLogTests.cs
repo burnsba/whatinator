@@ -18,7 +18,7 @@ public class WhatinatorEacLogTests
     {
         var text = WhatinatorEacLog.Format(CreateOptions());
 
-        Assert.Contains("whatinator V1.0.3 EAC-style extraction log\n", text, StringComparison.Ordinal);
+        Assert.Contains($"whatinator V{WhatinatorVersion.Current} EAC-style extraction log\n", text, StringComparison.Ordinal);
         Assert.Contains("whatinator extraction logfile from 17. August 2026, 09:00\n", text, StringComparison.Ordinal);
         Assert.Contains("Artist / Album\n", text, StringComparison.Ordinal);
         Assert.Contains("OS: Linux host\n", text, StringComparison.Ordinal);

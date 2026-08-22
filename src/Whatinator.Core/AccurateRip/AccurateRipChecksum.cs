@@ -20,6 +20,24 @@ public static class AccurateRipChecksum
     private const int TrimSamplePairs = (SectorBytes * 5) / 4;
 
     /// <summary>Computes a track's AccurateRip v1 and v2 checksums.</summary>
+    /// <remarks>
+    /// The leading trim (track 1) and trailing trim (last track) below
+    /// exclude 2939 and 2940 sample pairs respectively -- <b>not</b> a
+    /// symmetric 2940/2940, despite <see cref="TrimSamplePairs"/> being one
+    /// value used both places. This asymmetry looks like an off-by-one bug
+    /// (see <c>docs/backlog-completed/002-accuraterip-track-1-trim-asymmetry.md</c>
+    /// for the full writeup) but is not one: it is required to match the
+    /// real AccurateRip database's own convention. Verified live on
+    /// 2026-08-22 against a real 9-track disc in <c>/dev/sr1</c> (AccurateRip
+    /// disc IDs <c>001326da</c>/<c>008badbd</c>, CDDB ID <c>630d2d09</c>) --
+    /// track 1's checksum, computed by this exact method from a real
+    /// cd-paranoia rip at the drive's confirmed +6-sample offset, matched
+    /// two separate real confidence-rated entries in the live database
+    /// response for that disc, and <c>offset-find</c> independently
+    /// confirmed all 8 non-last tracks against the same response. Do not
+    /// "fix" this asymmetry without re-verifying against live data first --
+    /// see root <c>CLAUDE.md</c> § Gotchas: Ported algorithms.
+    /// </remarks>
     /// <param name="pcmData">
     /// The track's raw 16-bit stereo PCM samples -- a WAV file's <c>data</c>
     /// chunk with no header, as returned by <see cref="WavFile.ReadDataChunk"/>.
@@ -33,7 +51,12 @@ public static class AccurateRipChecksum
 
         var sampleCount = pcmData.Length / 4;
 
-        // 1-based inclusive bounds on the running MulBy position counter.
+        // Bounds on the running MulBy (1-based) position counter. Not
+        // symmetric -- see the verified-asymmetry note on this method's
+        // <remarks/>. Track 1 excludes 2939 leading samples (mulBy in
+        // [1, TrimSamplePairs) is excluded, i.e. i in [0, TrimSamplePairs-2]);
+        // the last track excludes 2940 trailing samples (i in
+        // [sampleCount-TrimSamplePairs, sampleCount-1]).
         var from = 0;
         var to = sampleCount;
         if (trackNumber == 1)

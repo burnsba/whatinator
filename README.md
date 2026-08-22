@@ -8,7 +8,7 @@ metadata from MusicBrainz and Discogs.
 
 ## Status
 
-This project is considered dev complete.
+Core functionality is complete, code review findings are being addressed.
 
 ## Required software
 

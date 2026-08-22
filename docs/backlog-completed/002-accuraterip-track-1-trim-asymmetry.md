@@ -1,6 +1,45 @@
 # AccurateRip track-1 trim is asymmetric by one sample
 
-**Status:** not started
+**Status:** done
+
+## Resolution (2026-08-22)
+
+Investigated live against a real 9-track disc in `/dev/sr1` at the drive's
+confirmed +6-sample offset. The counter-evidence scenario in this file (see
+below) turned out to be correct: **the asymmetry is not a bug.**
+
+- Ripped track 1 for real and computed its checksum with the actual,
+  unmodified `AccurateRipChecksum.Compute` (not a hardcoded literal): `v1 =
+  441b6d23`, `v2 = abfe3e16`.
+- Independently parsed that disc's real, freshly-fetched AccurateRip database
+  response and confirmed both values exactly matched two separate real
+  entries (confidence 15 and 26).
+- Ran `offset-find` against the same disc/drive: `Offset 6 confirmed: 8 of 8
+  track(s) matched` -- every non-last track, including track 1, matched the
+  live database using the code exactly as it stood.
+
+Conclusion: the leading trim (2939 samples excluded) is correct as written;
+it's the trailing trim's 2940 that happens to line up with what most public
+write-ups describe, not the other way around. Forcing them to be equal (as
+this file originally proposed) would have broken every future track-1 match.
+No logic change was made. What changed instead:
+
+- `AccurateRipChecksum.Compute` now carries a `<remarks>` doc comment
+  recording this verification (disc IDs, date, what was checked) so it can't
+  be re-litigated from first principles again.
+- New ground-truth test `AccurateRipChecksumTests.Compute_RealTrack1Clip_MatchesIndependentlyComputedChecksum`:
+  decodes a real 15-second clip from the start of that disc's track 1 (fixture:
+  `Fixtures/track1-clip15s.flac`) and runs it through the real `Compute()`,
+  asserting against a value independently re-derived by a separate Python
+  port of the algorithm -- exercises the real trim boundary on real audio.
+- New test `AccurateRipClientTests.MatchAsync_RealTrack1TrimAsymmetryFixture_ConfirmsLeadingTrimIsCorrect`:
+  parses the real live database response (fixture: `Fixtures/dBAR-009-001326da-008badbd-630d2d09.bin`)
+  and confirms the computed track-1 checksum matches it -- the live-database
+  half of the ground truth, kept separate from the real-audio-computation
+  test above.
+- Existing synthetic-data `AccurateRipChecksumTests` cases needed no
+  re-derivation (the logic didn't change) but now carry a class-level note
+  that they're change-detectors, not ground truth.
 
 ## Description
 
