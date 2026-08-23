@@ -313,6 +313,17 @@ public static class WhatinatorEacLog
 
         if (match.IsMatch)
         {
+            // computed.V1 == computed.V2 for this track is the one case
+            // where the version label genuinely can't be determined (see
+            // AccurateRipClient.MatchTrack): whichever computed value the
+            // served CRC equals, it equals the other one too, so equality
+            // doesn't identify an algorithm. Report the hit without
+            // asserting a version rather than defaulting to "v2".
+            if (match.ComputedV1 == match.ComputedV2)
+            {
+                return $"Accurately ripped (confidence {match.ConfidenceV2 ?? match.ConfidenceV1})  [{match.MatchedCrcV2 ?? match.MatchedCrcV1}]";
+            }
+
             var (confidence, crc, version) = match.ConfidenceV2 is not null
                 ? (match.ConfidenceV2, match.MatchedCrcV2, "v2")
                 : (match.ConfidenceV1, match.MatchedCrcV1, "v1");

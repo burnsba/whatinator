@@ -141,6 +141,16 @@ public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLoo
                 maxConfidenceCrc = crcHex;
             }
 
+            // Each entry's single CRC field carries no marker for which
+            // AccurateRip algorithm (v1 or v2) produced it -- the dBAR
+            // format simply doesn't have one. So it's tested against both
+            // locally computed values, and equality with one of them *is*
+            // the version identification: a served v1 CRC equalling
+            // computed.V2 by coincidence needs a ~2^-32 collision. The one
+            // case that's genuinely ambiguous is computed.V1 == computed.V2
+            // for this track (same coincidence odds) -- WhatinatorEacLog's
+            // FormatAccurateRipLine detects that and omits the version
+            // label rather than asserting one.
             if (crc == computed.V1 && (confidenceV1 is null || confidence > confidenceV1))
             {
                 confidenceV1 = confidence;
@@ -231,6 +241,17 @@ public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLoo
             {
                 confidences[t] = raw[pos];
                 checksums[t] = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(pos + 1, 4));
+
+                // The remaining 4 bytes of this 9-byte record (pos+5..pos+8,
+                // skipped by the pos += 9 below) are the offset-finding CRC:
+                // a checksum of samples around frame 450 of the track, used
+                // by some clients to detect a drive's pressing offset from a
+                // partial read instead of a full-track read. It carries no
+                // v1/v2 identity for the primary CRC above -- see MatchTrack.
+                // Not consumed here: this client verifies whole tracks, and
+                // Drive.OffsetFinder already determines offset by comparing
+                // full-track checksums (via IAccurateRipEntryLookup /
+                // AccurateRipChecksum), not a frame-level probe.
                 pos += 9;
             }
 

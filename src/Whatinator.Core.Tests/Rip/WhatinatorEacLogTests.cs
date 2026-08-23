@@ -84,6 +84,48 @@ public class WhatinatorEacLogTests
     }
 
     [Fact]
+    public void Format_AccurateRipHit_V1Only_UsesV1Label()
+    {
+        var match = new AccurateRipTrackMatch
+        {
+            TrackNumber = 1,
+            ComputedV1 = 1,
+            ComputedV2 = 2,
+            MatchedCrcV1 = "441B6D23",
+            ConfidenceV1 = 15,
+        };
+        var text = WhatinatorEacLog.Format(CreateOptions(accurateRipFound: true, match: match));
+
+        Assert.Contains("     Accurately ripped (confidence 15)  [441B6D23]  (AR v1)\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_AccurateRipHit_ComputedV1EqualsComputedV2_OmitsVersionLabel()
+    {
+        // The version label is only knowable because a match against just
+        // one of computed.V1/computed.V2 is (up to a ~2^-32 coincidence) a
+        // match against that specific algorithm's output. When the two
+        // computed values happen to coincide for this track, that inference
+        // breaks down -- see AccurateRipClient.MatchTrack and
+        // FormatAccurateRipLine.
+        var match = new AccurateRipTrackMatch
+        {
+            TrackNumber = 1,
+            ComputedV1 = 42,
+            ComputedV2 = 42,
+            MatchedCrcV1 = "0000002A",
+            ConfidenceV1 = 10,
+            MatchedCrcV2 = "0000002A",
+            ConfidenceV2 = 10,
+        };
+        var text = WhatinatorEacLog.Format(CreateOptions(accurateRipFound: true, match: match));
+
+        Assert.Contains("     Accurately ripped (confidence 10)  [0000002A]\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("(AR v1)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("(AR v2)", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Format_NoAccurateRipHit_UsesTrackNotPresentPhrasing()
     {
         var text = WhatinatorEacLog.Format(CreateOptions(accurateRipFound: false, match: null));

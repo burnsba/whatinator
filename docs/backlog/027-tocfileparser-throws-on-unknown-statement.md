@@ -1,6 +1,6 @@
 # TocFileParser aborts the whole rip on any unrecognised .toc statement
 
-**Status:** not started
+**Status:** evaluated, de-prioritized, not started
 
 ## Description
 
