@@ -8,9 +8,6 @@ namespace Whatinator.Cli;
 /// <summary>Implements the <c>offset-find</c> command.</summary>
 internal static class OffsetFindCommand
 {
-    /// <summary>The <c>User-Agent</c> sent with every AccurateRip database request.</summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
     /// <summary>
     /// Auto-detects the drive's sample read offset against the disc
     /// currently inserted, saving the result to the per-drive config map on
@@ -29,7 +26,7 @@ internal static class OffsetFindCommand
         // Console.Write* below still needs to use -- same pattern as rip/mp3.
         var standardOutput = Console.OpenStandardOutput();
 
-        var accurateRipClient = new AccurateRipClient(UserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
         var finder = new OffsetFinder(accurateRipClient);
 
         OffsetFindResult result;

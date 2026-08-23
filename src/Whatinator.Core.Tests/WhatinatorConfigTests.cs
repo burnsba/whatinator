@@ -89,6 +89,24 @@ public class WhatinatorConfigTests : IDisposable
     }
 
     [Fact]
+    public void EffectiveUserAgent_DefaultsToWhatinatorUserAgentDefault_ContainingCurrentVersion()
+    {
+        var config = new WhatinatorConfig();
+
+        Assert.Contains(WhatinatorVersion.Current, config.EffectiveUserAgent, StringComparison.Ordinal);
+        Assert.DoesNotContain("whatinator/0.1 (", config.EffectiveUserAgent, StringComparison.Ordinal);
+        Assert.Equal(WhatinatorUserAgent.Default, config.EffectiveUserAgent);
+    }
+
+    [Fact]
+    public void EffectiveUserAgent_ReturnsConfiguredValue_WhenSet()
+    {
+        var config = new WhatinatorConfig(UserAgent: "custom-agent/1.0 ( me@example.com )");
+
+        Assert.Equal("custom-agent/1.0 ( me@example.com )", config.EffectiveUserAgent);
+    }
+
+    [Fact]
     public void GetCacheDefeat_ReturnsUnknown_WhenMapIsNull()
     {
         var config = new WhatinatorConfig();

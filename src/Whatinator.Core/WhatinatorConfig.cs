@@ -11,6 +11,13 @@ namespace Whatinator.Core;
 /// Whether to create MP3s by default during the rip pipeline (phase 007+),
 /// unless overridden by a command-line flag.
 /// </param>
+/// <param name="UserAgent">
+/// Overrides the HTTP <c>User-Agent</c> sent with every MusicBrainz/Discogs/
+/// Cover Art Archive/AccurateRip request. <see langword="null"/> (the
+/// default) means <see cref="EffectiveUserAgent"/> computes
+/// <see cref="WhatinatorUserAgent.Default"/> instead -- a user only needs
+/// this key to substitute their own contact address.
+/// </param>
 /// <param name="ReadOffsets">
 /// Each known drive's sample read offset, keyed by <see cref="DriveKey"/>
 /// (<c>vendor|model|release</c>) -- a read offset is a property of the
@@ -35,9 +42,17 @@ namespace Whatinator.Core;
 public sealed record WhatinatorConfig(
     string Device = "/dev/sr1",
     bool MakeMp3 = true,
+    string? UserAgent = null,
     IReadOnlyDictionary<string, int>? ReadOffsets = null,
     IReadOnlyDictionary<string, CacheDefeatResult>? CacheDefeats = null)
 {
+    /// <summary>
+    /// The HTTP <c>User-Agent</c> to send with outbound requests: the
+    /// configured <see cref="UserAgent"/> if set, otherwise
+    /// <see cref="WhatinatorUserAgent.Default"/>.
+    /// </summary>
+    public string EffectiveUserAgent => UserAgent ?? WhatinatorUserAgent.Default;
+
     /// <summary>Builds the <see cref="ReadOffsets"/>/<see cref="CacheDefeats"/> key for a drive's vendor/model/release strings.</summary>
     /// <param name="vendor">The drive's vendor string (e.g. <c>ASUS</c>), or <see langword="null"/> if unknown.</param>
     /// <param name="model">The drive's model string (e.g. <c>DRW-24F1ST</c>), or <see langword="null"/> if unknown.</param>

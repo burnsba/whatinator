@@ -8,9 +8,6 @@ namespace Whatinator.Cli;
 /// <summary>Implements the <c>disc-info</c> command.</summary>
 internal static class DiscInfoCommand
 {
-    /// <summary>The <c>User-Agent</c> sent with the MusicBrainz request. See <see cref="MusicBrainzClient"/>'s constructor doc for why this needs to be descriptive.</summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
     /// <summary>
     /// Reads a disc's TOC and, best-effort, its MusicBrainz artist/title/track listing.
     /// Uses <c>libdiscid</c> for a fast disc-identification read -- for the
@@ -22,7 +19,8 @@ internal static class DiscInfoCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
     {
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? ConfigLoader.Load().Device;
+        var config = ConfigLoader.Load();
+        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
         var ask = CommandLineOptions.HasFlag(args, "--ask");
 
         Disc disc;
@@ -39,7 +37,7 @@ internal static class DiscInfoCommand
         Console.WriteLine($"Device: {device}");
         DiscInfoFormatter.Print(disc);
 
-        var musicBrainzClient = new MusicBrainzClient(UserAgent, httpClientFactory.CreateClient("musicbrainz"));
+        var musicBrainzClient = new MusicBrainzClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("musicbrainz"));
         var service = new MetadataService(musicBrainzClient);
 
         ReleaseInfo releaseInfo;

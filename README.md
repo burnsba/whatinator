@@ -74,6 +74,7 @@ defaults are used -- you don't need to create one.
 {
   "device": "/dev/sr1",
   "makeMp3": true,
+  "userAgent": "whatinator/1.0.11 ( you@example.com )",
   "readOffsets": { "ASUS|DRW-24F1ST   b|1.00": 6 },
   "cacheDefeats": { "ASUS|DRW-24F1ST   b|1.00": "CanDefeat" }
 }
@@ -83,6 +84,7 @@ defaults are used -- you don't need to create one.
 | --- | --- | --- |
 | `device` | `/dev/sr1` | Optical drive used when `--device` isn't given. |
 | `makeMp3` | `true` | Whether `pipeline` creates MP3s by default (overridden by that command's own `--no-mp3`). |
+| `userAgent` | `whatinator/{version} ( bethany.whatinator@burnsba.net )` | HTTP `User-Agent` sent with every MusicBrainz/Discogs/Cover Art Archive/AccurateRip request. Computed fresh from the running version unless set here; set it to substitute your own contact address. |
 | `readOffsets` | none | Per-drive sample read offset, keyed by `"{vendor}\|{model}\|{release}"` (see `whatinator list-device` for those three values). Populated automatically by `whatinator offset-find`; can still be edited by hand if you already know a drive's offset. |
 | `cacheDefeats` | none | Per-drive audio-cache-defeat result (`"CanDefeat"`/`"CannotDefeat"`/`"Unknown"`), same key shape as `readOffsets` -- feeds the rip log's "Defeat audio cache" field. Not run automatically (a full analysis takes real drive time); populate by hand after inspecting a drive with `cd-paranoia -A`. |
 

@@ -1,6 +1,6 @@
 # Unknown and misspelled command-line options are silently ignored
 
-**Status:** not started
+**Status:** evaluated, de-prioritized, not started
 
 ## Description
 

@@ -22,9 +22,6 @@ namespace Whatinator.Cli;
 /// </summary>
 internal static class PipelineCommand
 {
-    /// <summary>The <c>User-Agent</c> sent with every MusicBrainz/Discogs/Cover Art Archive request.</summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
     /// <summary>Resolves a release, then rips/packages every disc in range.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs/Cover Art Archive/AccurateRip <see cref="HttpClient"/>s from.</param>
@@ -60,8 +57,8 @@ internal static class PipelineCommand
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
-        var coverArtClient = new CoverArtClient(UserAgent, httpClientFactory.CreateClient("coverart"));
-        var accurateRipClient = new AccurateRipClient(UserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var coverArtClient = new CoverArtClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("coverart"));
+        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
         var pipelineRunner = new PipelineRunner(coverArtClient, accurateRipClient);
 
         // Deliberately not disposed: these wrap the process's real stdout/stderr,

@@ -1,6 +1,6 @@
 # HTTP User-Agent is duplicated six times and reports a stale version
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

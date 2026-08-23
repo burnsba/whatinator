@@ -9,9 +9,6 @@ namespace Whatinator.Cli;
 /// <summary>Implements the <c>flac</c> command.</summary>
 internal static class FlacCommand
 {
-    /// <summary>The <c>User-Agent</c> sent with every Cover Art Archive request.</summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
     /// <summary>Packages a rip's FLAC output into the project's standard folder layout.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the Cover Art Archive <see cref="HttpClient"/> from.</param>
@@ -52,7 +49,8 @@ internal static class FlacCommand
             return 1;
         }
 
-        var coverArtClient = new CoverArtClient(UserAgent, httpClientFactory.CreateClient("coverart"));
+        var config = ConfigLoader.Load();
+        var coverArtClient = new CoverArtClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("coverart"));
         var packager = new FlacPackager(coverArtClient);
 
         FlacPackageResult result;

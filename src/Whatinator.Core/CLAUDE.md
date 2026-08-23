@@ -48,7 +48,7 @@ Project reference: `Whatinator.LibDiscId`.
 | `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming`, `FlacFolderNaming`, `Mp3FolderNaming`, `TrackFileNaming`. |
 | `Rip/` | The extraction path. `CdParanoiaTrackReader`, its progress parsing trio (`CdParanoiaProgressLine`/`CdParanoiaProgressReporter`/`CdParanoiaLiveOutputFilter`), `WhatinatorRipRunner`, `PipelineRunner`, `WhatinatorEacLog`, `TrackFileMatcher`, `ProcessOutputRelay`. |
 | `Toc/` | The physical model. `CdrdaoTocReader` (runs `cdrdao read-toc`), `TocFileParser` (parses the `.toc` text), `DiscToc`/`DiscTocTrack`. |
-| root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`. |
+| root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |
 
 ## Key types, in dependency order
 

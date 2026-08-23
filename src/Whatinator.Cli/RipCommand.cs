@@ -25,9 +25,6 @@ namespace Whatinator.Cli;
 /// </summary>
 internal static class RipCommand
 {
-    /// <summary>The <c>User-Agent</c> sent with every AccurateRip database request.</summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
     /// <summary>Rips the disc in the drive, using an already-resolved <c>releaseinfo.json</c>.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the AccurateRip database <see cref="HttpClient"/> from.</param>
@@ -97,7 +94,7 @@ internal static class RipCommand
             return 1;
         }
 
-        var accurateRipClient = new AccurateRipClient(UserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
         var runner = new WhatinatorRipRunner(accurateRipClient);
         var options = new WhatinatorRipOptions(
             device, releaseInfo, toc, dest, DiscNumber: discNumber, Offset: offset, KeepWav: keepWav);

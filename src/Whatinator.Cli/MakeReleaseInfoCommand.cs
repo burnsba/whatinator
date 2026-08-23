@@ -10,13 +10,6 @@ namespace Whatinator.Cli;
 internal static class MakeReleaseInfoCommand
 {
     /// <summary>
-    /// The <c>User-Agent</c> sent with every MusicBrainz/Discogs request.
-    /// See <see cref="MusicBrainzClient"/>'s constructor doc for why this
-    /// needs to be descriptive.
-    /// </summary>
-    private const string UserAgent = "whatinator/0.1 ( bethany.whatinator@burnsba.net )";
-
-    /// <summary>
     /// Resolves a release -- either a fresh MusicBrainz/Discogs lookup, or
     /// (with <c>--releaseinfo</c>) the content of a supplied file -- and
     /// writes it to <c>releaseinfo.json</c> either way.
@@ -75,7 +68,8 @@ internal static class MakeReleaseInfoCommand
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
     internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(string[] args, IHttpClientFactory httpClientFactory)
     {
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? ConfigLoader.Load().Device;
+        var config = ConfigLoader.Load();
+        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
 
         Disc disc;
         try
@@ -88,7 +82,7 @@ internal static class MakeReleaseInfoCommand
             return null;
         }
 
-        var musicBrainzClient = new MusicBrainzClient(UserAgent, httpClientFactory.CreateClient("musicbrainz"), onRetry: ReportMusicBrainzRetry);
+        var musicBrainzClient = new MusicBrainzClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("musicbrainz"), onRetry: ReportMusicBrainzRetry);
         var service = new MetadataService(musicBrainzClient);
 
         ReleaseInfo releaseInfo;
@@ -127,7 +121,7 @@ internal static class MakeReleaseInfoCommand
             return null;
         }
 
-        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory).ConfigureAwait(false);
+        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory, config).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -140,15 +134,16 @@ internal static class MakeReleaseInfoCommand
     /// </summary>
     /// <param name="releaseInfo">The MusicBrainz-resolved release to enrich.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the Discogs <see cref="HttpClient"/> from.</param>
+    /// <param name="config">The loaded config, for <see cref="WhatinatorConfig.EffectiveUserAgent"/>.</param>
     /// <returns><paramref name="releaseInfo"/>, with <see cref="ReleaseInfo.Discogs"/> populated if a match was found and selected.</returns>
-    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory)
+    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory, WhatinatorConfig config)
     {
         if (string.IsNullOrWhiteSpace(releaseInfo.Barcode))
         {
             return releaseInfo;
         }
 
-        var discogsClient = new DiscogsClient(UserAgent, httpClientFactory.CreateClient("discogs"));
+        var discogsClient = new DiscogsClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("discogs"));
 
         IReadOnlyList<DiscogsInfo> candidates;
         try
