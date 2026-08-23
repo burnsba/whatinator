@@ -94,7 +94,7 @@ internal static class HelpContent
                 new HelpParagraph("Create checksum_sha256.txt from a folder's current contents (default dest: .)"),
             ]),
             new HelpCommand(["compare-checksum [--dest", "                  <path>]"], [
-                new HelpParagraph("Compare a folder's checksum_sha256.txt against its current contents; exits 1 if anything mismatched/missing/extra (default dest: .)"),
+                new HelpParagraph("Compare a folder's checksum_sha256.txt against its current contents; exits 1 if anything listed is mismatched or missing (extra unlisted files are reported but don't affect the exit code) (default dest: .)"),
             ]),
         ]),
         new HelpSection("Info", [

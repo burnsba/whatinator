@@ -1,3 +1,4 @@
+using Whatinator.Core.Checksums;
 using Whatinator.Core.CoverArt;
 using Whatinator.Core.Flac;
 using Whatinator.Core.Metadata;
@@ -50,6 +51,31 @@ public class FlacPackagerTests : IDisposable
         Assert.True(File.Exists(Path.Combine(result.ContainerDirectory, "checksum_sha256.txt")));
         Assert.True(File.Exists(Path.Combine(result.ContainerDirectory, "Artist - Album.m3u")));
         Assert.Empty(Directory.GetFiles(_sourceDir));
+    }
+
+    [Fact]
+    public async Task PackageAsync_ThenCompareChecksum_IsCleanAndScopedToFlacAndLog()
+    {
+        CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");
+        CreateFakeTrack(_sourceDir, "02. Artist - Track Two.flac");
+        CreateFakeLog(_sourceDir, "Artist - Album.log", "sample rip log content");
+
+        var releaseInfo = CreateSingleDiscRelease();
+        var coverArtClient = new FakeCoverArtClient(new CoverArtResult([1, 2, 3], ".jpg"));
+        var packager = new FlacPackager(coverArtClient);
+
+        var result = await packager.PackageAsync(new FlacPackageOptions(releaseInfo, _sourceDir, _destDir));
+
+        var compareResult = ChecksumFile.Compare(result.ContainerDirectory);
+
+        Assert.True(compareResult.IsClean);
+        Assert.Equal(3, compareResult.Matched.Count); // 2 flac + 1 log
+        Assert.Empty(compareResult.Mismatched);
+        Assert.Empty(compareResult.Missing);
+        Assert.Contains("releaseinfo.json", compareResult.Extra);
+        Assert.Contains("id.txt", compareResult.Extra);
+        Assert.Contains("Artist - Album.m3u", compareResult.Extra);
+        Assert.Contains(compareResult.Extra, e => e.StartsWith("cover.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -138,7 +164,7 @@ public class FlacPackagerTests : IDisposable
         Assert.Contains(afterDisc2, l => l.Contains("cd2/", StringComparison.Ordinal));
 
         var checksumLines = File.ReadAllLines(Path.Combine(result1.ContainerDirectory, "checksum_sha256.txt"));
-        Assert.Equal(4, checksumLines.Length);
+        Assert.Equal(6, checksumLines.Length); // 4 flac + 2 log
     }
 
     [Fact]

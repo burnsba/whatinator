@@ -33,6 +33,18 @@ persisted field on `ReleaseInfo`. A future cue-sheet writer should read
 `DiscToc` directly, the same way `WhatinatorEacLog` and `WhatinatorRipRunner`
 already do, rather than expecting UPC/ISRC to appear on `ReleaseInfo`.
 
+## Status update (backlog 003)
+
+`FlacPackager`'s checksum manifest now tracks `.flac` + `.log` files (see
+`docs/backlog-completed/003-compare-checksum-never-clean-on-packaged-folder.md`).
+When this item ships the `.cue` file, add `*.cue` to `FlacPackager`'s manifest
+patterns (`WriteChecksums`/`EnumerateManifestFiles`) and to
+`MetadataUpdater.WriteChecksums`'s pattern list, so the cue sheet is covered by
+`checksum_sha256.txt` like every other artifact meant to be integrity-checked.
+`Extra` is informational post-003, so skipping this wouldn't break
+`compare-checksum`'s exit code -- but the cue would go unverified, which
+defeats its purpose as part of an "exact copy."
+
 ## Dependencies
 
 - A gaps-accurate cue sheet requires per-track pregaps, which are currently never

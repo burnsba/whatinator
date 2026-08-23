@@ -20,7 +20,9 @@ namespace Whatinator.Core.Flac;
 /// <c>checksum_sha256.txt</c>, <c>.m3u</c>, cover art) by rescanning
 /// whatever <c>.flac</c> files are currently present -- safe to call once
 /// per disc of a multi-disc release, in any order, across separate
-/// sessions.
+/// sessions. <c>checksum_sha256.txt</c> itself only covers <c>.flac</c> and
+/// <c>.log</c> files, not the other container-level artifacts -- see
+/// <see cref="WriteChecksums(string)"/>.
 /// </summary>
 public sealed class FlacPackager
 {
@@ -118,14 +120,29 @@ public sealed class FlacPackager
         return destination;
     }
 
-    /// <summary>Rescans <paramref name="containerDir"/> for every <c>.flac</c> file and (re)writes <c>checksum_sha256.txt</c>.</summary>
+    /// <summary>
+    /// Rescans <paramref name="containerDir"/> for every <c>.flac</c> and
+    /// <c>.log</c> file and (re)writes <c>checksum_sha256.txt</c>. Deliberately
+    /// excludes <c>cover.*</c>, <c>id.txt</c>, <c>releaseinfo.json</c>, and
+    /// <c>.m3u</c> -- see
+    /// <c>docs/backlog-completed/003-compare-checksum-never-clean-on-packaged-folder.md</c>
+    /// for why. A future <c>.cue</c> file (backlog 040) belongs in this
+    /// pattern list too, once it exists.
+    /// </summary>
     /// <param name="containerDir">The release's container folder.</param>
     private static void WriteChecksums(string containerDir)
     {
-        var files = Directory.EnumerateFiles(containerDir, "*.flac", SearchOption.AllDirectories)
+        var files = EnumerateManifestFiles(containerDir, "*.flac", "*.log")
             .Select(path => (RelativePath: ToRelativePath(containerDir, path), AbsolutePath: path));
         ChecksumFile.Write(files, Path.Combine(containerDir, "checksum_sha256.txt"));
     }
+
+    /// <summary>Enumerates every file under <paramref name="containerDir"/> matching any of <paramref name="patterns"/>, recursively.</summary>
+    /// <param name="containerDir">The directory to scan.</param>
+    /// <param name="patterns">The file globs to match.</param>
+    /// <returns>Matching absolute file paths.</returns>
+    private static IEnumerable<string> EnumerateManifestFiles(string containerDir, params string[] patterns) =>
+        patterns.SelectMany(pattern => Directory.EnumerateFiles(containerDir, pattern, SearchOption.AllDirectories));
 
     /// <summary>
     /// Rescans each medium's disc folder for <c>.flac</c> files and (re)writes

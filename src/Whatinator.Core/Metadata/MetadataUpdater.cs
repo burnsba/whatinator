@@ -90,14 +90,22 @@ public static class MetadataUpdater
             $"'{directory}' has neither .flac nor .mp3 files -- can't determine which release format to update.");
     }
 
-    /// <summary>Rescans <paramref name="directory"/> for files matching <paramref name="extension"/> and (re)writes the checksum manifest.</summary>
+    /// <summary>
+    /// Rescans <paramref name="directory"/> for files matching
+    /// <paramref name="extension"/> plus <c>.log</c> files and (re)writes the
+    /// checksum manifest -- matching <see cref="FlacPackager"/>/
+    /// <see cref="Mp3Packager"/>'s manifest scope (audio + log, not
+    /// cover/id.txt/releaseinfo.json/.m3u -- see
+    /// <c>docs/backlog-completed/003-compare-checksum-never-clean-on-packaged-folder.md</c>).
+    /// </summary>
     /// <param name="directory">The release container folder.</param>
     /// <param name="extension">The audio extension to hash (<c>".flac"</c> or <c>".mp3"</c>).</param>
     /// <param name="checksumFilePath">The destination manifest path.</param>
     /// <returns>How many files were hashed.</returns>
     private static int WriteChecksums(string directory, string extension, string checksumFilePath)
     {
-        var files = Directory.EnumerateFiles(directory, "*" + extension, SearchOption.AllDirectories)
+        var files = new[] { "*" + extension, "*.log" }
+            .SelectMany(pattern => Directory.EnumerateFiles(directory, pattern, SearchOption.AllDirectories))
             .Select(path => (RelativePath: ToRelativePath(directory, path), AbsolutePath: path))
             .ToList();
         ChecksumFile.Write(files, checksumFilePath);

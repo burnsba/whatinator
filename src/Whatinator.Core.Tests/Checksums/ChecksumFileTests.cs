@@ -126,7 +126,7 @@ public class ChecksumFileTests : IDisposable
     }
 
     [Fact]
-    public void Compare_UnlistedFile_ReportsExtra()
+    public void Compare_UnlistedFile_ReportsExtraButStaysClean()
     {
         File.WriteAllText(Path.Combine(_tempDir, "a.txt"), "a");
         ChecksumFile.Generate(_tempDir);
@@ -134,7 +134,7 @@ public class ChecksumFileTests : IDisposable
 
         var result = ChecksumFile.Compare(_tempDir);
 
-        Assert.False(result.IsClean);
+        Assert.True(result.IsClean);
         Assert.Equal(["b.txt"], result.Extra);
     }
 

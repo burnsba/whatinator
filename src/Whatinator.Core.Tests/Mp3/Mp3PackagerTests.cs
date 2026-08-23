@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Whatinator.Core.Checksums;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Mp3;
 
@@ -64,6 +65,32 @@ public class Mp3PackagerTests : IDisposable
     }
 
     [Fact]
+    public async Task PackageAsync_ThenCompareChecksum_IsCleanAndScopedToMp3AndLog()
+    {
+        CreateFakeFlac(_sourceDir, "01. Artist - Track One.flac");
+        CreateFakeFlac(_sourceDir, "02. Artist - Track Two.flac");
+        CreateSyntheticJpeg(Path.Combine(_sourceDir, "cover.jpg"));
+
+        var releaseInfo = CreateSingleDiscRelease();
+        var packager = new Mp3Packager();
+        using var stdout = new MemoryStream();
+        using var stderr = new MemoryStream();
+
+        var result = await packager.PackageAsync(new Mp3PackageOptions(releaseInfo, _sourceDir, _destDir), stdout, stderr);
+
+        var compareResult = ChecksumFile.Compare(result.ContainerDirectory);
+
+        Assert.True(compareResult.IsClean);
+        Assert.Equal(3, compareResult.Matched.Count); // 2 mp3 + 1 log
+        Assert.Empty(compareResult.Mismatched);
+        Assert.Empty(compareResult.Missing);
+        Assert.Contains("releaseinfo.json", compareResult.Extra);
+        Assert.Contains("id.txt", compareResult.Extra);
+        Assert.Contains("Artist - Album.m3u", compareResult.Extra);
+        Assert.Contains("cover.jpg", compareResult.Extra);
+    }
+
+    [Fact]
     public async Task PackageAsync_MultiDisc_RequiresDiscNumber()
     {
         var releaseInfo = CreateMultiDiscRelease();
@@ -124,7 +151,7 @@ public class Mp3PackagerTests : IDisposable
         Assert.Contains(afterDisc2, l => l.Contains("cd2/", StringComparison.Ordinal));
 
         var checksumLines = File.ReadAllLines(Path.Combine(result1.ContainerDirectory, "checksum_sha256.txt"));
-        Assert.Equal(4, checksumLines.Length);
+        Assert.Equal(6, checksumLines.Length); // 4 mp3 + 2 log
     }
 
     [Fact]

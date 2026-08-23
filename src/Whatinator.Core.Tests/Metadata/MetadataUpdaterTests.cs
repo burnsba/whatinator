@@ -1,3 +1,4 @@
+using Whatinator.Core.Checksums;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Naming;
 
@@ -86,6 +87,29 @@ public class MetadataUpdaterTests : IDisposable
         Assert.True(File.Exists(Path.Combine(containerDir, "id.txt")));
         Assert.Equal(1, result.ChecksumFileCount);
         Assert.True(File.Exists(result.ChecksumFilePath));
+    }
+
+    [Fact]
+    public void Apply_ThenCompareChecksum_IsCleanAndIncludesLogFile()
+    {
+        var oldRelease = CreateRelease();
+        var containerDir = SetUpPackagedFolder(oldRelease, ".flac");
+        File.WriteAllText(Path.Combine(containerDir, "Artist - Album.log"), "fake rip log");
+        File.WriteAllText(Path.Combine(containerDir, "id.txt"), "fake id.txt");
+        File.WriteAllText(Path.Combine(containerDir, "Artist - Album.m3u"), "fake m3u");
+
+        var newRelease = oldRelease with { Barcode = "1234567890" };
+        var result = MetadataUpdater.Apply(newRelease, containerDir);
+
+        Assert.Equal(2, result.ChecksumFileCount); // audio + log
+
+        var compareResult = ChecksumFile.Compare(containerDir);
+        Assert.True(compareResult.IsClean);
+        Assert.Empty(compareResult.Mismatched);
+        Assert.Empty(compareResult.Missing);
+        Assert.Contains("id.txt", compareResult.Extra);
+        Assert.Contains("Artist - Album.m3u", compareResult.Extra);
+        Assert.Contains("releaseinfo.json", compareResult.Extra);
     }
 
     [Fact]
