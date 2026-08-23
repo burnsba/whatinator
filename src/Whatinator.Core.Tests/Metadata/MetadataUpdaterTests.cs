@@ -159,9 +159,8 @@ public class MetadataUpdaterTests : IDisposable
 
     private string SetUpPackagedFolder(ReleaseInfo release, string audioExtension)
     {
-        var folderName = audioExtension == ".flac"
-            ? FlacFolderNaming.ContainerFolderName(release)
-            : Mp3FolderNaming.ContainerFolderName(release);
+        var folderName = ReleaseFolderNaming.ContainerFolderName(
+            release, audioExtension == ".flac" ? "flac" : "mp3 v0");
         var containerDir = Path.Combine(_tempDir, folderName);
         Directory.CreateDirectory(containerDir);
         File.WriteAllText(Path.Combine(containerDir, "01. Track" + audioExtension), "fake audio");

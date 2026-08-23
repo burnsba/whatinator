@@ -45,7 +45,7 @@ Project reference: `Whatinator.LibDiscId`.
 | `Metadata/` | The editorial model (`ReleaseInfo`/`MediumInfo`/`TrackInfo`), its JSON file (`ReleaseInfoFile`), lookup orchestration (`MetadataService`), and the corrections path (`MetadataUpdater`). |
 | `Mp3/` | `LameEncoder` (V0) , `Mp3Packager`, `Mp3LogFile`. |
 | `MusicBrainz/` | `MusicBrainzClient` plus the `Mb*` DTOs (all `internal` -- they never leak past the client). |
-| `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming`, `FlacFolderNaming`, `Mp3FolderNaming`, `TrackFileNaming`. |
+| `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming` (includes `ContainerFolderName`, parameterized by format tag), `TrackFileNaming`. |
 | `Rip/` | The extraction path. `CdParanoiaTrackReader`, its progress parsing trio (`CdParanoiaProgressLine`/`CdParanoiaProgressReporter`/`CdParanoiaLiveOutputFilter`), `WhatinatorRipRunner`, `PipelineRunner`, `WhatinatorEacLog`, `TrackFileMatcher`, `ProcessOutputRelay`. |
 | `Toc/` | The physical model. `CdrdaoTocReader` (runs `cdrdao read-toc`), `TocFileParser` (parses the `.toc` text), `DiscToc`/`DiscTocTrack`. |
 | root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |

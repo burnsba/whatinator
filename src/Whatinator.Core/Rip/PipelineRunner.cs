@@ -101,7 +101,7 @@ public sealed class PipelineRunner
         {
             var containerDir = Path.Combine(
                 options.DestinationParentDirectory,
-                FlacFolderNaming.ContainerFolderName(options.ReleaseInfo));
+                ReleaseFolderNaming.ContainerFolderName(options.ReleaseInfo, "flac"));
             var eventualDiscDirectory = options.SkipFlacPackaging
                 ? rawDir
                 : isMultiDisc ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(discNumber)) : containerDir;

@@ -55,7 +55,7 @@ public sealed class FlacPackager
         var isMultiDisc = releaseInfo.Media.Count > 1;
         var discNumber = ReleaseFolderNaming.ResolveDiscNumber(releaseInfo, options.DiscNumber);
 
-        var containerDir = Path.Combine(options.DestinationParentDirectory, FlacFolderNaming.ContainerFolderName(releaseInfo));
+        var containerDir = Path.Combine(options.DestinationParentDirectory, ReleaseFolderNaming.ContainerFolderName(releaseInfo, "flac"));
         var discDir = isMultiDisc ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(discNumber)) : containerDir;
         Directory.CreateDirectory(discDir);
 

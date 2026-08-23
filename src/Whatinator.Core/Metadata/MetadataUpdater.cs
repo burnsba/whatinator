@@ -119,9 +119,8 @@ public static class MetadataUpdater
     /// <returns>The folder's final path, and whether it was renamed.</returns>
     private static (string FinalDirectory, bool Renamed) RenameIfNeeded(ReleaseInfo newReleaseInfo, string targetDirectory, string extension)
     {
-        var expectedName = extension == ".flac"
-            ? FlacFolderNaming.ContainerFolderName(newReleaseInfo)
-            : Mp3FolderNaming.ContainerFolderName(newReleaseInfo);
+        var expectedName = ReleaseFolderNaming.ContainerFolderName(
+            newReleaseInfo, extension == ".flac" ? "flac" : "mp3 v0");
 
         var trimmed = Path.TrimEndingDirectorySeparator(targetDirectory);
         var currentName = Path.GetFileName(trimmed);

@@ -55,10 +55,61 @@ public class ReleaseFolderNamingTests
         Assert.Equal(expected, ReleaseFolderNaming.SortArtist(artist));
     }
 
-    private static ReleaseInfo CreateReleaseInfo(string? date = "1992-05-12", string title = "Diva") => new(
+    [Theory]
+    [InlineData("flac", "Annie Lennox - Diva [flac 1992]")]
+    [InlineData("mp3 v0", "Annie Lennox - Diva [mp3 v0 1992]")]
+    public void ContainerFolderName_BuildsExpectedFormat(string formatTag, string expected)
+    {
+        var releaseInfo = CreateReleaseInfo(date: "1992-05-12");
+
+        Assert.Equal(expected, ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
+    }
+
+    [Theory]
+    [InlineData("flac", "1992-05-12", "1992")]
+    [InlineData("flac", "1992-05", "1992")]
+    [InlineData("flac", "1992", "1992")]
+    [InlineData("flac", null, "0000")]
+    [InlineData("flac", "", "0000")]
+    [InlineData("flac", "unknown", "0000")]
+    [InlineData("mp3 v0", "1992-05-12", "1992")]
+    [InlineData("mp3 v0", "1992-05", "1992")]
+    [InlineData("mp3 v0", "1992", "1992")]
+    [InlineData("mp3 v0", null, "0000")]
+    [InlineData("mp3 v0", "", "0000")]
+    [InlineData("mp3 v0", "unknown", "0000")]
+    public void ContainerFolderName_ExtractsYear(string formatTag, string? date, string expectedYear)
+    {
+        var releaseInfo = CreateReleaseInfo(date: date);
+
+        Assert.Contains($"[{formatTag} {expectedYear}]", ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
+    }
+
+    [Theory]
+    [InlineData("flac")]
+    [InlineData("mp3 v0")]
+    public void ContainerFolderName_SanitizesForbiddenCharacters(string formatTag)
+    {
+        var releaseInfo = CreateReleaseInfo(title: "A/B: The Album");
+
+        Assert.DoesNotContain('/', ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
+        Assert.DoesNotContain(':', ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
+    }
+
+    [Theory]
+    [InlineData("flac", "Sugarcubes, The - Stick Around for Joy [flac 1992]")]
+    [InlineData("mp3 v0", "Sugarcubes, The - Stick Around for Joy [mp3 v0 1992]")]
+    public void ContainerFolderName_ReordersLeadingThe_ForSorting(string formatTag, string expected)
+    {
+        var releaseInfo = CreateReleaseInfo(date: "1992-01-01", artist: "The Sugarcubes", title: "Stick Around for Joy");
+
+        Assert.Equal(expected, ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
+    }
+
+    private static ReleaseInfo CreateReleaseInfo(string? date = "1992-05-12", string title = "Diva", string artist = "Annie Lennox") => new(
         MusicBrainzReleaseId: "id",
         MusicBrainzUrl: "https://musicbrainz.org/release/id",
-        Artist: "Annie Lennox",
+        Artist: artist,
         Title: title,
         Date: date,
         Country: null,

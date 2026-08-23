@@ -4,8 +4,7 @@ namespace Whatinator.Core.Naming;
 
 /// <summary>
 /// Shared building blocks for release output folder/file names, used by
-/// both FLAC (<see cref="FlacFolderNaming"/>) and MP3
-/// (<see cref="Mp3FolderNaming"/>) packaging.
+/// both FLAC and MP3 packaging.
 /// </summary>
 public static class ReleaseFolderNaming
 {
@@ -28,10 +27,10 @@ public static class ReleaseFolderNaming
     /// Reorders a leading <c>"The "</c> to the end, comma-separated, so the
     /// artist sorts alongside other artists by their main name -- e.g.
     /// <c>"The Sugarcubes"</c> becomes <c>"Sugarcubes, The"</c>. Used only
-    /// for container folder names (<see cref="FlacFolderNaming.ContainerFolderName"/>/
-    /// <see cref="Mp3FolderNaming.ContainerFolderName"/>); <see cref="ReleaseInfo.Artist"/>
-    /// itself, tags, <c>id.txt</c>, and the <c>.m3u</c> name (see
-    /// <see cref="ReleaseDisplayName"/>) all keep the original word order.
+    /// for container folder names (<see cref="ContainerFolderName"/>);
+    /// <see cref="ReleaseInfo.Artist"/> itself, tags, <c>id.txt</c>, and the
+    /// <c>.m3u</c> name (see <see cref="ReleaseDisplayName"/>) all keep the
+    /// original word order.
     /// </summary>
     /// <param name="artist">The artist name to reorder.</param>
     /// <returns>The sort-friendly artist name, or <paramref name="artist"/> unchanged if it doesn't start with "The ".</returns>
@@ -61,6 +60,26 @@ public static class ReleaseFolderNaming
         }
 
         return "0000";
+    }
+
+    /// <summary>
+    /// Builds the container folder name: <c>"{Artist} - {Title} [{formatTag} {Year}]"</c>,
+    /// with a leading <c>"The "</c> in the artist reordered to sort alongside
+    /// other artists (see <see cref="SortArtist"/>). The format tag is the
+    /// caller's (the packager's) concern -- current callers pass
+    /// <c>"flac"</c> or <c>"mp3 v0"</c>.
+    /// </summary>
+    /// <param name="releaseInfo">The release to name a folder for.</param>
+    /// <param name="formatTag">The format tag to embed, e.g. <c>"flac"</c> or <c>"mp3 v0"</c>.</param>
+    /// <returns>The sanitized folder name (not a full path).</returns>
+    public static string ContainerFolderName(ReleaseInfo releaseInfo, string formatTag)
+    {
+        ArgumentNullException.ThrowIfNull(releaseInfo);
+        ArgumentNullException.ThrowIfNull(formatTag);
+
+        var year = ExtractYear(releaseInfo.Date);
+        var sortArtist = SortArtist(releaseInfo.Artist);
+        return FileNameSanitizer.Sanitize($"{sortArtist} - {releaseInfo.Title} [{formatTag} {year}]");
     }
 
     /// <summary>Resolves and validates the disc number a packaging/rip call is for.</summary>

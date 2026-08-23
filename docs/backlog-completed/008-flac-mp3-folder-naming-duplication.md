@@ -1,6 +1,6 @@
 # FlacFolderNaming and Mp3FolderNaming are identical apart from the format tag
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

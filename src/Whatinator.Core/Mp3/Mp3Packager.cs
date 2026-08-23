@@ -64,7 +64,7 @@ public sealed class Mp3Packager
         var discNumber = ReleaseFolderNaming.ResolveDiscNumber(releaseInfo, options.DiscNumber);
         var medium = releaseInfo.Media.Single(m => m.Position == discNumber);
 
-        var containerDir = Path.Combine(options.DestinationParentDirectory, Mp3FolderNaming.ContainerFolderName(releaseInfo));
+        var containerDir = Path.Combine(options.DestinationParentDirectory, ReleaseFolderNaming.ContainerFolderName(releaseInfo, "mp3 v0"));
         var discDir = isMultiDisc ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(discNumber)) : containerDir;
         Directory.CreateDirectory(discDir);
 
