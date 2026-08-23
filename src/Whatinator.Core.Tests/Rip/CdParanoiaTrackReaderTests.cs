@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Whatinator.Core.Rip;
 using Whatinator.Core.Toc;
 
@@ -199,6 +200,51 @@ public class CdParanoiaTrackReaderTests
         Assert.Equal(5, callCount);
     }
 
+    [Fact]
+    public async Task ReadTrackAsync_CleansUpScratchFilesAndKillsProcess_WhenCancelled()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "whatinator-cdparanoia-tests-" + Guid.NewGuid());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // "/dev/null" isn't a real optical device -- cd-paranoia will
+            // fail to open it -- but that's fine: process.Start() happens
+            // unconditionally before the cancellable wait, so a
+            // pre-cancelled token kills it (or observes it already exited)
+            // within microseconds regardless of how fast it would have
+            // failed on its own.
+            var destinationPath = Path.Combine(tempDir, "track01.wav");
+            var options = new CdParanoiaTrackOptions("/dev/null", SingleTrackToc, 1, destinationPath);
+
+            var reader = new CdParanoiaTrackReader();
+            using var stdout = new MemoryStream();
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => reader.ReadTrackAsync(options, stdout, cts.Token));
+
+            Assert.Empty(Directory.GetFiles(tempDir, "whatinator-*-test.wav"));
+            Assert.Empty(Directory.GetFiles(tempDir, "whatinator-*-copy.wav"));
+
+            // Matched by command line (the unique tempDir), not just process
+            // name -- other test classes in this suite spawn real
+            // cd-paranoia too, and xunit runs different test classes in
+            // parallel by default.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline && Process.GetProcessesByName("cd-paranoia").Any(p => CommandLineContains(p.Id, tempDir)))
+            {
+                await Task.Delay(50);
+            }
+
+            Assert.DoesNotContain(Process.GetProcessesByName("cd-paranoia"), p => CommandLineContains(p.Id, tempDir));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -207,5 +253,19 @@ public class CdParanoiaTrackReaderTests
         var result = new CdParanoiaTrackResult(matched, matched ? "/tmp/out.wav" : null, matched ? 123u : null, null, null, 1);
 
         Assert.Equal(expectedDegraded, result.Degraded);
+    }
+
+    /// <summary>Whether process <paramref name="pid"/>'s command line contains <paramref name="needle"/> (Linux <c>/proc</c> only, matching this Linux-first project's other real-tool tests).</summary>
+    private static bool CommandLineContains(int pid, string needle)
+    {
+        try
+        {
+            var cmdline = File.ReadAllText($"/proc/{pid}/cmdline").Replace('\0', ' ');
+            return cmdline.Contains(needle, StringComparison.Ordinal);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 }

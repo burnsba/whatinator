@@ -31,8 +31,9 @@ internal static class RipCommand
     /// <summary>Rips the disc in the drive, using an already-resolved <c>releaseinfo.json</c>.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the AccurateRip database <see cref="HttpClient"/> from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
         if (releaseInfoPath is null)
@@ -88,7 +89,7 @@ internal static class RipCommand
         DiscToc toc;
         try
         {
-            toc = await tocReader.ReadAsync(device, fastToc: true, standardError).ConfigureAwait(false);
+            toc = await tocReader.ReadAsync(device, fastToc: true, standardError, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or Win32Exception)
         {
@@ -105,7 +106,7 @@ internal static class RipCommand
         var startTime = DateTimeOffset.UtcNow;
         try
         {
-            result = await runner.RipAsync(options, standardOutput, standardError).ConfigureAwait(false);
+            result = await runner.RipAsync(options, standardOutput, standardError, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {

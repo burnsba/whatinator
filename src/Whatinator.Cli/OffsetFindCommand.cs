@@ -18,8 +18,9 @@ internal static class OffsetFindCommand
     /// </summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the AccurateRip database <see cref="HttpClient"/> from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var config = ConfigLoader.Load();
         var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
@@ -34,7 +35,7 @@ internal static class OffsetFindCommand
         OffsetFindResult result;
         try
         {
-            result = await finder.FindAsync(device, standardOutput).ConfigureAwait(false);
+            result = await finder.FindAsync(device, standardOutput, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or Win32Exception)
         {

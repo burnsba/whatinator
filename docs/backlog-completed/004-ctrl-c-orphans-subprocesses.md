@@ -1,6 +1,6 @@
 # Ctrl-C orphans subprocesses; cancellation is plumbed but never connected
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

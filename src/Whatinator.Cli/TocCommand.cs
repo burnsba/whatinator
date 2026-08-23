@@ -15,8 +15,9 @@ internal static class TocCommand
     /// instead, see <c>disc-info</c>.
     /// </summary>
     /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args)
+    public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? ConfigLoader.Load().Device;
         var full = CommandLineOptions.HasFlag(args, "--full");
@@ -25,7 +26,7 @@ internal static class TocCommand
         DiscToc toc;
         try
         {
-            toc = await reader.ReadAsync(device, fastToc: !full, Console.OpenStandardError()).ConfigureAwait(false);
+            toc = await reader.ReadAsync(device, fastToc: !full, Console.OpenStandardError(), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or Win32Exception)
         {

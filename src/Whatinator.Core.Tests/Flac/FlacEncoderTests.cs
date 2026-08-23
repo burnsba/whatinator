@@ -117,6 +117,65 @@ public class FlacEncoderTests : IDisposable
         Assert.Equal("USRC17607839", tags["ISRC"]);
     }
 
+    [Fact]
+    public async Task EncodeAsync_KillsProcess_WhenCancelled()
+    {
+        var wavPath = Path.Combine(_tempDir, "in.wav");
+        var flacPath = Path.Combine(_tempDir, "out.flac");
+        CreateSyntheticWav(wavPath);
+
+        var options = new FlacEncodeOptions(
+            InputWavPath: wavPath,
+            OutputFlacPath: flacPath,
+            Title: "Track One",
+            Artist: "Artist",
+            Album: "Album",
+            AlbumArtist: "Album Artist",
+            Year: "1999",
+            TrackNumber: 1,
+            TrackCount: 10,
+            Genre: "Rock",
+            Isrc: "USRC17607839");
+
+        var encoder = new FlacEncoder();
+        using var stdout = new MemoryStream();
+        using var stderr = new MemoryStream();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // process.Start() happens unconditionally before the cancellable
+        // WaitForExitAsync call, so pre-cancelling avoids racing flac's own
+        // (usually sub-millisecond) runtime -- the kill path fires within
+        // microseconds of the child starting either way.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => encoder.EncodeAsync(options, stdout, stderr, cts.Token));
+
+        // Matched by command line (the unique flacPath), not just process
+        // name -- other test classes in this suite spawn real `flac` too,
+        // and xunit runs different test classes in parallel by default.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline && Process.GetProcessesByName("flac").Any(p => CommandLineContains(p.Id, flacPath)))
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.DoesNotContain(Process.GetProcessesByName("flac"), p => CommandLineContains(p.Id, flacPath));
+    }
+
+    /// <summary>Whether process <paramref name="pid"/>'s command line contains <paramref name="needle"/> (Linux <c>/proc</c> only, matching this Linux-first project's other real-tool tests).</summary>
+    private static bool CommandLineContains(int pid, string needle)
+    {
+        try
+        {
+            var cmdline = File.ReadAllText($"/proc/{pid}/cmdline").Replace('\0', ' ');
+            return cmdline.Contains(needle, StringComparison.Ordinal);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private static Dictionary<string, string> ReadTags(string flacPath)
     {
         var startInfo = new ProcessStartInfo

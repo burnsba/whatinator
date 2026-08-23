@@ -10,8 +10,9 @@ internal static class Mp3Command
 {
     /// <summary>Encodes a FLAC folder into the project's standard V0 MP3 folder layout.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args)
+    public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
         var source = CommandLineOptions.GetValue(args, "--source");
@@ -56,7 +57,8 @@ internal static class Mp3Command
                 .PackageAsync(
                     new Mp3PackageOptions(releaseInfo, source, dest, discNumber),
                     Console.OpenStandardOutput(),
-                    Console.OpenStandardError())
+                    Console.OpenStandardError(),
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DirectoryNotFoundException)

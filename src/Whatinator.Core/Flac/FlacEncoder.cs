@@ -35,7 +35,7 @@ public sealed class FlacEncoder : IFlacEncoder
         var relayOutTask = ProcessOutputRelay.RelayAsync(process.StandardOutput.BaseStream, standardOutput, cancellationToken);
         var relayErrTask = ProcessOutputRelay.RelayAsync(process.StandardError.BaseStream, standardError, cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
         await Task.WhenAll(relayOutTask, relayErrTask).ConfigureAwait(false);
 
         return new FlacEncodeResult(process.ExitCode);

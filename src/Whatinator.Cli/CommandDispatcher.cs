@@ -11,8 +11,16 @@ internal static class CommandDispatcher
     /// <c>flac</c>/<c>pipeline</c>/<c>offset-find</c> need one -- everything
     /// else has no network dependency).
     /// </param>
+    /// <param name="cancellationToken">
+    /// Cancelled when the user hits Ctrl-C (see <c>Program.cs</c>). Threaded
+    /// into every command whose underlying <c>Whatinator.Core</c> calls
+    /// accept one; <c>disc-info</c>/<c>make-releaseinfo</c>/<c>flac</c>
+    /// don't take it because nothing they call does yet (their MusicBrainz/
+    /// Discogs/cover-art/packaging calls have no cancellation support --
+    /// see the http-cancellation backlog item).
+    /// </param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
         if (args.Length == 0)
         {
@@ -39,21 +47,21 @@ internal static class CommandDispatcher
             case "disc-info":
                 return await DiscInfoCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
             case "toc":
-                return await TocCommand.RunAsync(rest).ConfigureAwait(false);
+                return await TocCommand.RunAsync(rest, cancellationToken).ConfigureAwait(false);
             case "make-releaseinfo":
                 return await MakeReleaseInfoCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
             case "id-txt":
                 return IdTxtCommand.Run(rest);
             case "rip":
-                return await RipCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
+                return await RipCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
             case "flac":
                 return await FlacCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
             case "mp3":
-                return await Mp3Command.RunAsync(rest).ConfigureAwait(false);
+                return await Mp3Command.RunAsync(rest, cancellationToken).ConfigureAwait(false);
             case "pipeline":
-                return await PipelineCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
+                return await PipelineCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
             case "offset-find":
-                return await OffsetFindCommand.RunAsync(rest, httpClientFactory).ConfigureAwait(false);
+                return await OffsetFindCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
             case "make-checksum":
                 return MakeChecksumCommand.Run(rest);
             case "compare-checksum":

@@ -363,7 +363,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         var relayTask = TeeRelayLinesAsync(process.StandardError, captured, renderer, cancellationToken);
         var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
         await Task.WhenAll(relayTask, drainStdoutTask).ConfigureAwait(false);
 
         return (process.ExitCode, captured.ToString());
@@ -488,7 +488,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
 
             var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
             var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
             var stderrText = await stderrTask.ConfigureAwait(false);
             await drainStdoutTask.ConfigureAwait(false);
 

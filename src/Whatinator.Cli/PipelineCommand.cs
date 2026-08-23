@@ -28,8 +28,9 @@ internal static class PipelineCommand
     /// <summary>Resolves a release, then rips/packages every disc in range.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs/Cover Art Archive/AccurateRip <see cref="HttpClient"/>s from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
         var releaseInfo = await ResolveReleaseInfoAsync(args, dest, httpClientFactory).ConfigureAwait(false);
@@ -106,7 +107,8 @@ internal static class PipelineCommand
                         KeepWav: keepWav,
                         Environment: environment),
                     standardOutput,
-                    standardError).ConfigureAwait(false);
+                    standardError,
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DirectoryNotFoundException)
             {

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Whatinator.Core.Rip;
 
 namespace Whatinator.Core.Drive;
 
@@ -28,7 +29,7 @@ public static partial class CacheDefeatAnalyzer
 
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
         var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
         var output = await stderrTask.ConfigureAwait(false);
         await drainStdoutTask.ConfigureAwait(false);
 

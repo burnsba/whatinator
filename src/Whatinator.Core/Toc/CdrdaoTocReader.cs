@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using Whatinator.Core.Rip;
 
 namespace Whatinator.Core.Toc;
 
@@ -51,7 +52,7 @@ public sealed class CdrdaoTocReader : ICdrdaoTocReader
             var relayTask = RelayFilteredAsync(process.StandardError, standardOutput, filter, cancellationToken);
             var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
 
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
             await Task.WhenAll(relayTask, drainStdoutTask).ConfigureAwait(false);
 
             if (process.ExitCode != 0)
