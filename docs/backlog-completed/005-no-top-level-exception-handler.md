@@ -1,6 +1,6 @@
 # No top-level exception handler; a malformed config stack-traces every command
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

@@ -152,6 +152,7 @@ Hash/check a folder's contents against a manifest -- independent of any particul
 | --- | --- |
 | `help` / `--help` / `-h` | Show usage. |
 | `--version` / `-v` | Show the current version. |
+| `<command> --debug` | Print the full stack trace for an unhandled exception instead of a one-line message (same effect as setting the `WHATINATOR_DEBUG` environment variable). Must come after the command name, like any other flag. |
 
 ## Layout
 

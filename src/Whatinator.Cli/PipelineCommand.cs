@@ -160,8 +160,17 @@ internal static class PipelineCommand
             releaseInfo = resolved;
         }
 
-        Directory.CreateDirectory(dest);
-        ReleaseInfoFile.Save(releaseInfo, Path.Combine(dest, "releaseinfo.json"));
+        try
+        {
+            Directory.CreateDirectory(dest);
+            ReleaseInfoFile.Save(releaseInfo, Path.Combine(dest, "releaseinfo.json"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Failed to write to {dest}: {ex.Message}");
+            return null;
+        }
+
         return releaseInfo;
     }
 

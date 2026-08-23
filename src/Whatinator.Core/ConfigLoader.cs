@@ -25,7 +25,11 @@ public static class ConfigLoader
     /// overridable for testing.
     /// </param>
     /// <returns>The loaded configuration, or defaults if no file exists.</returns>
-    /// <exception cref="JsonException">The config file exists but isn't valid JSON.</exception>
+    /// <exception cref="JsonException">
+    /// The config file exists but isn't valid JSON. The message names
+    /// <paramref name="configPath"/> (or the resolved default path) so a
+    /// caller that lets this propagate still tells the user which file to fix.
+    /// </exception>
     public static WhatinatorConfig Load(string? configPath = null)
     {
         var path = configPath ?? ResolveDefaultPath();
@@ -35,7 +39,14 @@ public static class ConfigLoader
         }
 
         using var stream = File.OpenRead(path);
-        return JsonSerializer.Deserialize<WhatinatorConfig>(stream, JsonOptions) ?? new WhatinatorConfig();
+        try
+        {
+            return JsonSerializer.Deserialize<WhatinatorConfig>(stream, JsonOptions) ?? new WhatinatorConfig();
+        }
+        catch (JsonException ex)
+        {
+            throw new JsonException($"Config file '{path}' contains invalid JSON: {ex.Message}", ex);
+        }
     }
 
     /// <summary>

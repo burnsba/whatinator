@@ -32,9 +32,17 @@ internal static class IdTxtCommand
             return 1;
         }
 
-        Directory.CreateDirectory(dest);
         var outputPath = Path.Combine(dest, "id.txt");
-        IdTextFile.Write(releaseInfo, outputPath);
+        try
+        {
+            Directory.CreateDirectory(dest);
+            IdTextFile.Write(releaseInfo, outputPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Failed to write to {dest}: {ex.Message}");
+            return 1;
+        }
 
         Console.WriteLine($"Wrote {outputPath}");
         return 0;

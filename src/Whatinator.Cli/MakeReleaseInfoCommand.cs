@@ -45,9 +45,17 @@ internal static class MakeReleaseInfoCommand
             releaseInfo = resolved;
         }
 
-        Directory.CreateDirectory(dest);
         var outputPath = Path.Combine(dest, "releaseinfo.json");
-        ReleaseInfoFile.Save(releaseInfo, outputPath);
+        try
+        {
+            Directory.CreateDirectory(dest);
+            ReleaseInfoFile.Save(releaseInfo, outputPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Failed to write to {dest}: {ex.Message}");
+            return 1;
+        }
 
         var trackCount = releaseInfo.Media.Sum(medium => medium.Tracks.Count);
         Console.WriteLine($"{releaseInfo.Artist} - {releaseInfo.Title} ({releaseInfo.Media.Count} disc(s), {trackCount} tracks)");

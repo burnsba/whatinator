@@ -100,6 +100,9 @@ internal static class HelpContent
         new HelpSection("Info", [
             new HelpCommand(["help"], [new HelpParagraph("Show this help")]),
             new HelpCommand(["--version"], [new HelpParagraph("Show the current version")]),
+            new HelpCommand(["<command> --debug"], [
+                new HelpParagraph("Print the full stack trace for an unhandled exception instead of a one-line message (same effect as setting WHATINATOR_DEBUG); must come after the command name"),
+            ]),
         ]),
     ];
 }

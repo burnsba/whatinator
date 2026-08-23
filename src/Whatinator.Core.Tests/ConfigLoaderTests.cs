@@ -65,6 +65,17 @@ public class ConfigLoaderTests : IDisposable
     }
 
     [Fact]
+    public void Load_JsonExceptionMessage_NamesTheConfigPath()
+    {
+        var path = Path.Combine(_tempDir, "config.json");
+        File.WriteAllText(path, "{ not valid json");
+
+        var ex = Assert.Throws<System.Text.Json.JsonException>(() => ConfigLoader.Load(path));
+
+        Assert.Contains(path, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Save_ThenLoad_RoundTrips()
     {
         var path = Path.Combine(_tempDir, "config.json");
