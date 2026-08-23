@@ -1,6 +1,4 @@
 using System.Security.Cryptography;
-using Whatinator.Core.Flac;
-using Whatinator.Core.Mp3;
 
 namespace Whatinator.Core.Checksums;
 
@@ -28,11 +26,10 @@ public static class ChecksumFile
     /// Recursively hashes every file under <paramref name="directory"/>
     /// (except the manifest itself) and writes
     /// <c>checksum_sha256.txt</c> at its root. Unlike
-    /// <see cref="FlacPackager"/>/<see cref="Mp3Packager"/>'s internal
-    /// checksum writer, which only hashes the one audio extension it
-    /// knows a release folder holds, this makes no assumption about what
-    /// kind of folder it's given -- used by the standalone
-    /// <c>make-checksum</c> command.
+    /// <see cref="Whatinator.Core.ReleasePackageArtifacts.WriteChecksums"/>,
+    /// which only hashes the one audio extension it knows a release folder
+    /// holds, this makes no assumption about what kind of folder it's given
+    /// -- used by the standalone <c>make-checksum</c> command.
     /// </summary>
     /// <param name="directory">The folder to checksum.</param>
     /// <returns>How many files were hashed.</returns>
@@ -101,6 +98,19 @@ public static class ChecksumFile
         return new ChecksumCompareResult(matched, mismatched, missing, extra);
     }
 
+    /// <summary>
+    /// Converts an absolute path to a forward-slash-separated path relative
+    /// to <paramref name="baseDir"/>. The single implementation shared by
+    /// every class that writes a relative-path manifest entry (checksum
+    /// lines, <c>.m3u</c> entries) -- see <see cref="ReleasePackageArtifacts"/>
+    /// and <see cref="Whatinator.Core.Metadata.MetadataUpdater"/>.
+    /// </summary>
+    /// <param name="baseDir">The base directory.</param>
+    /// <param name="fullPath">The absolute path to make relative.</param>
+    /// <returns>The relative path, using <c>/</c> regardless of host OS.</returns>
+    internal static string ToRelativePath(string baseDir, string fullPath) =>
+        Path.GetRelativePath(baseDir, fullPath).Replace(Path.DirectorySeparatorChar, '/');
+
     /// <summary>Parses a <c>checksum_sha256.txt</c> manifest's lines into (relative path, hash) pairs.</summary>
     /// <param name="manifestPath">The manifest file to read.</param>
     /// <returns>Each line's relative path and expected hash.</returns>
@@ -134,13 +144,6 @@ public static class ChecksumFile
     /// <returns>Absolute file paths.</returns>
     private static IEnumerable<string> EnumerateFiles(string directory) =>
         Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories);
-
-    /// <summary>Converts an absolute path to a forward-slash-separated path relative to <paramref name="baseDir"/>.</summary>
-    /// <param name="baseDir">The base directory.</param>
-    /// <param name="fullPath">The absolute path to make relative.</param>
-    /// <returns>The relative path, using <c>/</c> regardless of host OS.</returns>
-    private static string ToRelativePath(string baseDir, string fullPath) =>
-        Path.GetRelativePath(baseDir, fullPath).Replace(Path.DirectorySeparatorChar, '/');
 
     /// <summary>Computes the uppercase-hex SHA-256 digest of a file's contents.</summary>
     /// <param name="path">The file to hash.</param>

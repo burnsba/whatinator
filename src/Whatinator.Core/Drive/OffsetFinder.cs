@@ -1,4 +1,3 @@
-using System.Text;
 using Whatinator.Core.AccurateRip;
 using Whatinator.Core.Rip;
 using Whatinator.Core.Toc;
@@ -126,7 +125,7 @@ public sealed class OffsetFinder
 
         foreach (var candidate in CandidateOffsets)
         {
-            await WriteLineAsync(standardOutput, $"Trying offset {candidate}...", cancellationToken).ConfigureAwait(false);
+            await StreamLineWriter.WriteLineAsync(standardOutput, $"Trying offset {candidate}...", cancellationToken).ConfigureAwait(false);
 
             var track1Pcm = await _readTrackOnce(device, toc, audioTracks[0].TrackNumber, candidate, standardOutput, cancellationToken)
                 .ConfigureAwait(false);
@@ -154,14 +153,14 @@ public sealed class OffsetFinder
 
             if (matchedCount == checkedCount)
             {
-                await WriteLineAsync(
+                await StreamLineWriter.WriteLineAsync(
                     standardOutput,
                     $"Offset {candidate} confirmed: {matchedCount} of {matchedCount} track(s) matched.",
                     cancellationToken).ConfigureAwait(false);
                 return new OffsetFindResult(candidate, null);
             }
 
-            await WriteLineAsync(
+            await StreamLineWriter.WriteLineAsync(
                 standardOutput,
                 $"Offset {candidate}: only {matchedCount} of {checkedCount} track(s) matched, trying next candidate.",
                 cancellationToken).ConfigureAwait(false);
@@ -212,13 +211,5 @@ public sealed class OffsetFinder
                 File.Delete(outputPath);
             }
         }
-    }
-
-    /// <summary>Writes a single line to <paramref name="stream"/>.</summary>
-    private static async Task WriteLineAsync(Stream stream, string message, CancellationToken cancellationToken)
-    {
-        var bytes = Encoding.UTF8.GetBytes(message + Environment.NewLine);
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 }

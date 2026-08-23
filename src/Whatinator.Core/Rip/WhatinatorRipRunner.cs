@@ -1,4 +1,3 @@
-using System.Text;
 using Whatinator.Core.AccurateRip;
 using Whatinator.Core.Flac;
 using Whatinator.Core.Naming;
@@ -82,10 +81,11 @@ public sealed class WhatinatorRipRunner
         var dataTrackCount = options.Toc.Tracks.Count - audioTracks.Count;
         if (dataTrackCount > 0)
         {
-            await WriteLineAsync(
+            await StreamLineWriter.WriteLineAsync(
                 standardError,
                 $"Warning: skipping {dataTrackCount} data track(s) on this disc -- not ripped.",
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                timestamped: true).ConfigureAwait(false);
         }
 
         var year = ReleaseFolderNaming.ExtractYear(options.ReleaseInfo.Date);
@@ -104,7 +104,7 @@ public sealed class WhatinatorRipRunner
             // Neither cd-paranoia nor flac has a concept of "this is track 3
             // of an 11-track batch" -- each is invoked once per track, so this
             // orchestrator is the only thing that knows the batch shape.
-            await WriteLineAsync(standardOutput, $"Track {i + 1} of {audioTracks.Count}: {track.Title}", cancellationToken)
+            await StreamLineWriter.WriteLineAsync(standardOutput, $"Track {i + 1} of {audioTracks.Count}: {track.Title}", cancellationToken, timestamped: true)
                 .ConfigureAwait(false);
 
             var baseFileName = TrackFileNaming.BuildBaseFileName(options.ReleaseInfo, track);
@@ -129,7 +129,7 @@ public sealed class WhatinatorRipRunner
             // indexes database entries the same way.
             checksums.Add(AccurateRipChecksum.Compute(WavFile.ReadDataChunk(readResult.WavPath!), i + 1, audioTracks.Count));
 
-            await WriteLineAsync(standardOutput, "Converting WAV to FLAC...", cancellationToken).ConfigureAwait(false);
+            await StreamLineWriter.WriteLineAsync(standardOutput, "Converting WAV to FLAC...", cancellationToken, timestamped: true).ConfigureAwait(false);
 
             var flacPath = Path.Combine(options.OutputDirectory, baseFileName + ".flac");
             var encodeOptions = new FlacEncodeOptions(
@@ -183,13 +183,5 @@ public sealed class WhatinatorRipRunner
         }
 
         return new WhatinatorRipResult(merged, arResult.Found, dataTrackCount);
-    }
-
-    /// <summary>Writes a single timestamped line to <paramref name="stream"/> -- every line this runner prints itself happens once ripping is underway, so it's always prefixed (see root <c>CLAUDE.md</c> § Gotchas).</summary>
-    private static async Task WriteLineAsync(Stream stream, string message, CancellationToken cancellationToken)
-    {
-        var bytes = Encoding.UTF8.GetBytes(RipOutputTimestamp.Prefix() + message + Environment.NewLine);
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 }

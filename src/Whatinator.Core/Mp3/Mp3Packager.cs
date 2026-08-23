@@ -1,5 +1,3 @@
-using System.Text;
-using Whatinator.Core.Checksums;
 using Whatinator.Core.Flac;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Naming;
@@ -25,7 +23,7 @@ namespace Whatinator.Core.Mp3;
 /// a multi-disc release, in any order, across separate sessions.
 /// <c>checksum_sha256.txt</c> itself only covers <c>.mp3</c> and <c>.log</c>
 /// files, not the other container-level artifacts -- see
-/// <see cref="WriteChecksums(string)"/>; it's written after the fresh
+/// <see cref="Whatinator.Core.ReleasePackageArtifacts.WriteChecksums"/>; it's written after the fresh
 /// <see cref="Mp3LogFile"/> below rather than before, so the log exists to be
 /// hashed. Writes a
 /// fresh <see cref="Mp3LogFile"/> for this run every time (unlike the FLAC
@@ -100,8 +98,8 @@ public sealed class Mp3Packager
 
         // Written after the log, not before -- WriteChecksums includes .log files, so it
         // must run once the log actually exists on disk (see backlog-completed 003).
-        WriteChecksums(containerDir);
-        WritePlaylist(releaseInfo, containerDir, isMultiDisc);
+        ReleasePackageArtifacts.WriteChecksums(containerDir, ".mp3");
+        ReleasePackageArtifacts.WritePlaylist(releaseInfo, containerDir, isMultiDisc, ".mp3");
 
         return new Mp3PackageResult(containerDir, discDir, matches.Count, logFilePath, copiedCoverArtPath);
     }
@@ -131,9 +129,8 @@ public sealed class Mp3Packager
         for (var i = 0; i < matches.Count; i++)
         {
             var (track, flacPath) = matches[i];
-            var progressLine = Encoding.UTF8.GetBytes($"Track {i + 1} of {matches.Count}: {track.Title}\n");
-            await standardOutput.WriteAsync(progressLine, cancellationToken).ConfigureAwait(false);
-            await standardOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await StreamLineWriter.WriteLineAsync(standardOutput, $"Track {i + 1} of {matches.Count}: {track.Title}", cancellationToken)
+                .ConfigureAwait(false);
 
             var outputPath = Path.Combine(discDir, Path.GetFileNameWithoutExtension(flacPath) + ".mp3");
             var encodeOptions = new LameEncodeOptions(
@@ -201,73 +198,4 @@ public sealed class Mp3Packager
 
         return destination;
     }
-
-    /// <summary>
-    /// Rescans <paramref name="containerDir"/> for every <c>.mp3</c> and
-    /// <c>.log</c> file and (re)writes <c>checksum_sha256.txt</c>. Deliberately
-    /// excludes <c>cover.*</c>, <c>id.txt</c>, <c>releaseinfo.json</c>, and
-    /// <c>.m3u</c> -- see
-    /// <c>docs/backlog-completed/003-compare-checksum-never-clean-on-packaged-folder.md</c>
-    /// for why.
-    /// </summary>
-    /// <param name="containerDir">The release's container folder.</param>
-    private static void WriteChecksums(string containerDir)
-    {
-        var files = EnumerateManifestFiles(containerDir, "*.mp3", "*.log")
-            .Select(path => (RelativePath: ToRelativePath(containerDir, path), AbsolutePath: path));
-        ChecksumFile.Write(files, Path.Combine(containerDir, "checksum_sha256.txt"));
-    }
-
-    /// <summary>Enumerates every file under <paramref name="containerDir"/> matching any of <paramref name="patterns"/>, recursively.</summary>
-    /// <param name="containerDir">The directory to scan.</param>
-    /// <param name="patterns">The file globs to match.</param>
-    /// <returns>Matching absolute file paths.</returns>
-    private static IEnumerable<string> EnumerateManifestFiles(string containerDir, params string[] patterns) =>
-        patterns.SelectMany(pattern => Directory.EnumerateFiles(containerDir, pattern, SearchOption.AllDirectories));
-
-    /// <summary>
-    /// Rescans each medium's disc folder for <c>.mp3</c> files and (re)writes
-    /// the release's <c>.m3u</c>. A medium whose folder doesn't exist yet is
-    /// omitted entirely; a medium missing only some tracks (a degraded rip)
-    /// still contributes whichever tracks <see cref="TrackFileMatcher"/>
-    /// actually found files for.
-    /// </summary>
-    /// <param name="releaseInfo">The release being packaged.</param>
-    /// <param name="containerDir">The release's container folder.</param>
-    /// <param name="isMultiDisc">Whether discs live in <c>cd1/</c>/<c>cd2/</c> subfolders or flat in <paramref name="containerDir"/>.</param>
-    private static void WritePlaylist(ReleaseInfo releaseInfo, string containerDir, bool isMultiDisc)
-    {
-        var entries = new List<(string RelativePath, string Artist, string Title, int DurationSeconds)>();
-
-        foreach (var medium in releaseInfo.Media.OrderBy(m => m.Position))
-        {
-            var mediumDir = isMultiDisc
-                ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(medium.Position))
-                : containerDir;
-            if (!Directory.Exists(mediumDir))
-            {
-                continue;
-            }
-
-            var mp3Files = Directory.GetFiles(mediumDir, "*.mp3");
-            foreach (var (track, file) in TrackFileMatcher.Match(mp3Files, medium.Tracks))
-            {
-                entries.Add((
-                    ToRelativePath(containerDir, file),
-                    track.Artist,
-                    track.Title,
-                    (int)track.Duration.TotalSeconds));
-            }
-        }
-
-        var m3uPath = Path.Combine(containerDir, ReleaseFolderNaming.ReleaseDisplayName(releaseInfo) + ".m3u");
-        M3uPlaylist.Write(entries, m3uPath);
-    }
-
-    /// <summary>Converts an absolute path to a forward-slash-separated path relative to <paramref name="baseDir"/>.</summary>
-    /// <param name="baseDir">The base directory.</param>
-    /// <param name="fullPath">The absolute path to make relative.</param>
-    /// <returns>The relative path, using <c>/</c> regardless of host OS.</returns>
-    private static string ToRelativePath(string baseDir, string fullPath) =>
-        Path.GetRelativePath(baseDir, fullPath).Replace(Path.DirectorySeparatorChar, '/');
 }

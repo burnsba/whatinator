@@ -471,12 +471,8 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     }
 
     /// <summary>Writes a single timestamped warning line to <paramref name="standardOutput"/> -- this method is only ever called from within an already-timestamped rip's track loop.</summary>
-    private static async Task WriteWarningAsync(Stream standardOutput, string message, CancellationToken cancellationToken)
-    {
-        var bytes = Encoding.UTF8.GetBytes(RipOutputTimestamp.Prefix() + message + Environment.NewLine);
-        await standardOutput.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-        await standardOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
-    }
+    private static async Task WriteWarningAsync(Stream standardOutput, string message, CancellationToken cancellationToken) =>
+        await StreamLineWriter.WriteLineAsync(standardOutput, message, cancellationToken, timestamped: true).ConfigureAwait(false);
 
     /// <summary>Best-effort peak sample level via <c>sox &lt;file&gt; -n stats -b 16</c>; <see langword="null"/> if <c>sox</c> is missing or its output can't be parsed.</summary>
     private static async Task<int?> TryGetPeakLevelAsync(string wavPath, CancellationToken cancellationToken)

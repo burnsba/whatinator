@@ -1,6 +1,6 @@
 # FlacPackager and Mp3Packager duplicate the whole container-artifact sequence
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

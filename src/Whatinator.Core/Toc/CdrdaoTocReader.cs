@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using Whatinator.Core.Rip;
 
 namespace Whatinator.Core.Toc;
@@ -72,7 +71,7 @@ public sealed class CdrdaoTocReader : ICdrdaoTocReader
                 var line = toc.CatalogNumber is not null
                     ? $"Found disk catalogue number: {toc.CatalogNumber}"
                     : "Found disk catalogue number.";
-                await WriteLineAsync(standardOutput, line, cancellationToken).ConfigureAwait(false);
+                await StreamLineWriter.WriteLineAsync(standardOutput, line, cancellationToken).ConfigureAwait(false);
             }
 
             return toc;
@@ -128,16 +127,8 @@ public sealed class CdrdaoTocReader : ICdrdaoTocReader
             var output = filter.Process(line);
             if (output is not null)
             {
-                await WriteLineAsync(destination, output, cancellationToken).ConfigureAwait(false);
+                await StreamLineWriter.WriteLineAsync(destination, output, cancellationToken).ConfigureAwait(false);
             }
         }
-    }
-
-    /// <summary>Writes a single newline-terminated line to <paramref name="destination"/>, flushing immediately to keep it live.</summary>
-    private static async Task WriteLineAsync(Stream destination, string line, CancellationToken cancellationToken)
-    {
-        var bytes = Encoding.UTF8.GetBytes(line + "\n");
-        await destination.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-        await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 }

@@ -48,7 +48,7 @@ Project reference: `Whatinator.LibDiscId`.
 | `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming` (includes `ContainerFolderName`, parameterized by format tag), `TrackFileNaming`. |
 | `Rip/` | The extraction path. `CdParanoiaTrackReader`, its progress parsing trio (`CdParanoiaProgressLine`/`CdParanoiaProgressReporter`/`CdParanoiaLiveOutputFilter`), `WhatinatorRipRunner`, `PipelineRunner`, `WhatinatorEacLog`, `TrackFileMatcher`, `ProcessOutputRelay`. |
 | `Toc/` | The physical model. `CdrdaoTocReader` (runs `cdrdao read-toc`), `TocFileParser` (parses the `.toc` text), `DiscToc`/`DiscTocTrack`. |
-| root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |
+| root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `ReleasePackageArtifacts` (the FLAC/MP3 packagers' shared container-artifact sequence), `StreamLineWriter`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |
 
 ## Key types, in dependency order
 
@@ -66,7 +66,11 @@ Titles, artists, dates, `Media[]`. No frames.
 
 **Packaging:** `FlacPackager.PackageAsync(FlacPackageOptions)` ->
 `FlacPackageResult`; `Mp3Packager.PackageAsync(Mp3PackageOptions)` ->
-`Mp3PackageResult`. `PipelineRunner.RunDiscAsync(PipelineDiscOptions)` ->
+`Mp3PackageResult`. Both call into `ReleasePackageArtifacts` for the
+container-level artifact sequence (`releaseinfo.json`, `id.txt`, checksum
+manifest, `.m3u`), parameterized by audio extension so the rescan logic
+exists once rather than once per format; `MetadataUpdater` reuses its
+checksum rescan too. `PipelineRunner.RunDiscAsync(PipelineDiscOptions)` ->
 `PipelineDiscResult` composes TOC + rip + both packagers for one disc.
 
 **Reporting:** `WhatinatorEacLog.Format(EacLogOptions)` renders the EAC-shaped
