@@ -15,7 +15,7 @@ internal sealed class FakeCoverArtClient : ICoverArtClient
 
     public int CallCount { get; private set; }
 
-    public Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId)
+    public Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId, CancellationToken cancellationToken = default)
     {
         CallCount++;
         return Task.FromResult(_result);

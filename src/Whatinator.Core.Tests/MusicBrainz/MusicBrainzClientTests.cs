@@ -199,17 +199,72 @@ public class MusicBrainzClientTests
         Assert.Equal(TimeSpan.FromMinutes(3) + TimeSpan.FromSeconds(10), delays[^1]);
     }
 
+    [Fact]
+    public async Task LookupByDiscIdAsync_RetriesTimeout_ThenWrapsAfterExhaustingAttempts()
+    {
+        var callCount = 0;
+        var client = CreateClient(_ =>
+        {
+            callCount++;
+            throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout.", new TimeoutException(), new CancellationToken(canceled: true));
+        });
+
+        await Assert.ThrowsAsync<MusicBrainzException>(() => client.LookupByDiscIdAsync("some-disc-id"));
+
+        Assert.Equal(10, callCount);
+    }
+
+    [Fact]
+    public async Task LookupByDiscIdAsync_ThrowsMusicBrainzException_OnUnexpectedContentType()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html>MusicBrainz is down for maintenance</html>", System.Text.Encoding.UTF8, "text/html"),
+        });
+        var client = new MusicBrainzClient(
+            "whatinator-tests/1.0 ( test@example.com )",
+            new HttpClient(handler),
+            onRetry: null,
+            delayAsync: (_, _) => Task.CompletedTask);
+
+        await Assert.ThrowsAsync<MusicBrainzException>(() => client.LookupByDiscIdAsync("some-disc-id"));
+    }
+
+    [Fact]
+    public async Task LookupByDiscIdAsync_CancellingCallerToken_AbortsBackoffDelay_InsteadOfWaitingItOut()
+    {
+        // Uses the real (non-instant) delay -- the public constructor's
+        // Task.Delay(delay, cancellationToken) -- to prove cancellation
+        // actually interrupts the wait rather than merely being ignored by
+        // a test double. A transient 503 triggers the retry path, whose
+        // first backoff is 1 second (BaseRetryDelay); an already-cancelled
+        // token must abort that wait almost immediately.
+        var client = new MusicBrainzClient(
+            "whatinator-tests/1.0 ( test@example.com )",
+            new HttpClient(new StubHttpMessageHandler(HttpStatusCode.ServiceUnavailable, string.Empty)));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // The caller's own cancellation must never be treated as a transient
+        // timeout to retry -- it should propagate immediately as some flavor
+        // of OperationCanceledException, not get wrapped in MusicBrainzException.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.LookupByDiscIdAsync("some-disc-id", cts.Token));
+
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Expected the cancelled backoff to abort promptly, took {stopwatch.Elapsed}.");
+    }
+
     private static MusicBrainzClient CreateClient(HttpStatusCode statusCode, string responseBody) =>
         new(
             "whatinator-tests/1.0 ( test@example.com )",
             new HttpClient(new StubHttpMessageHandler(statusCode, responseBody)),
             onRetry: null,
-            delayAsync: _ => Task.CompletedTask);
+            delayAsync: (_, _) => Task.CompletedTask);
 
     private static MusicBrainzClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder, Action<int, int, TimeSpan, Exception>? onRetry = null) =>
         new(
             "whatinator-tests/1.0 ( test@example.com )",
             new HttpClient(new StubHttpMessageHandler(responder)),
             onRetry,
-            delayAsync: _ => Task.CompletedTask);
+            delayAsync: (_, _) => Task.CompletedTask);
 }

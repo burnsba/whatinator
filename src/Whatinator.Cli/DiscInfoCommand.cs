@@ -16,8 +16,9 @@ internal static class DiscInfoCommand
     /// </summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the MusicBrainz <see cref="HttpClient"/> from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var config = ConfigLoader.Load();
         var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
@@ -43,7 +44,7 @@ internal static class DiscInfoCommand
         ReleaseInfo releaseInfo;
         try
         {
-            var result = await service.LookupByDiscIdAsync(disc.Id).ConfigureAwait(false);
+            var result = await service.LookupByDiscIdAsync(disc.Id, cancellationToken).ConfigureAwait(false);
             switch (result.Status)
             {
                 case MetadataLookupStatus.Found:
@@ -79,7 +80,7 @@ internal static class DiscInfoCommand
                         chosen = candidates[0];
                     }
 
-                    releaseInfo = await service.ResolveAsync(chosen.MusicBrainzReleaseId).ConfigureAwait(false);
+                    releaseInfo = await service.ResolveAsync(chosen.MusicBrainzReleaseId, cancellationToken).ConfigureAwait(false);
                     break;
                 default:
                     Console.WriteLine();

@@ -12,8 +12,9 @@ internal static class FlacCommand
     /// <summary>Packages a rip's FLAC output into the project's standard folder layout.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the Cover Art Archive <see cref="HttpClient"/> from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
         var source = CommandLineOptions.GetValue(args, "--source");
@@ -57,7 +58,7 @@ internal static class FlacCommand
         try
         {
             result = await packager
-                .PackageAsync(new FlacPackageOptions(releaseInfo, source, dest, discNumber))
+                .PackageAsync(new FlacPackageOptions(releaseInfo, source, dest, discNumber), cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DirectoryNotFoundException)

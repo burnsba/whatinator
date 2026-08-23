@@ -11,6 +11,7 @@ public interface ICoverArtClient
 {
     /// <summary>Attempts to download a release's front cover image.</summary>
     /// <param name="musicBrainzReleaseId">The MusicBrainz release MBID.</param>
+    /// <param name="cancellationToken">A token to cancel the download.</param>
     /// <returns>The downloaded image, or <see langword="null"/> if none is available or the request failed.</returns>
-    Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId);
+    Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId, CancellationToken cancellationToken = default);
 }

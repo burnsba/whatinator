@@ -1,6 +1,6 @@
 # HTTP clients lack cancellation and lose two failure modes
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

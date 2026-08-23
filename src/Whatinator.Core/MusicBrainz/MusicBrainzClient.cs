@@ -22,7 +22,7 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
 
     private readonly HttpClient _httpClient;
     private readonly Action<int, int, TimeSpan, Exception>? _onRetry;
-    private readonly Func<TimeSpan, Task> _delayAsync;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
 
     /// <summary>Initializes a new instance of the <see cref="MusicBrainzClient"/> class.</summary>
     /// <param name="userAgent">
@@ -46,7 +46,7 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     /// itself. <see langword="null"/> to retry silently.
     /// </param>
     public MusicBrainzClient(string userAgent, HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry = null)
-        : this(userAgent, httpClient, onRetry, Task.Delay)
+        : this(userAgent, httpClient, onRetry, (delay, cancellationToken) => Task.Delay(delay, cancellationToken))
     {
     }
 
@@ -59,8 +59,8 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     /// <param name="userAgent">The <c>User-Agent</c> header value sent with every request.</param>
     /// <param name="httpClient">The <see cref="HttpClient"/> to issue requests with.</param>
     /// <param name="onRetry">Invoked just before each backoff wait; <see langword="null"/> to retry silently.</param>
-    /// <param name="delayAsync">Replaces the real <see cref="Task.Delay(TimeSpan)"/> wait between retries.</param>
-    internal MusicBrainzClient(string userAgent, HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry, Func<TimeSpan, Task> delayAsync)
+    /// <param name="delayAsync">Replaces the real <see cref="Task.Delay(TimeSpan, CancellationToken)"/> wait between retries.</param>
+    internal MusicBrainzClient(string userAgent, HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry, Func<TimeSpan, CancellationToken, Task> delayAsync)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userAgent);
         ArgumentNullException.ThrowIfNull(httpClient);
@@ -74,28 +74,30 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
 
     /// <summary>Looks up every release matching the given MusicBrainz disc ID.</summary>
     /// <param name="discId">The MusicBrainz disc ID, as returned by <see cref="LibDiscId.DiscReader"/>.</param>
+    /// <param name="cancellationToken">A token to cancel the lookup.</param>
     /// <returns>Every matching release, without full track listings (see <see cref="GetReleaseAsync"/>).</returns>
     /// <exception cref="MusicBrainzException">The request failed or the response couldn't be parsed.</exception>
-    public async Task<IReadOnlyList<ReleaseCandidate>> LookupByDiscIdAsync(string discId)
+    public async Task<IReadOnlyList<ReleaseCandidate>> LookupByDiscIdAsync(string discId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(discId);
 
         var url = $"discid/{Uri.EscapeDataString(discId)}?fmt=json&inc=artist-credits+labels";
-        var response = await GetAsync<MbDiscIdResponse>(url).ConfigureAwait(false);
+        var response = await GetAsync<MbDiscIdResponse>(url, cancellationToken).ConfigureAwait(false);
 
         return response.Releases.Select(ToCandidate).ToList();
     }
 
     /// <summary>Fetches the full metadata (including every disc's full track listing) for a release.</summary>
     /// <param name="releaseId">The MusicBrainz release MBID.</param>
+    /// <param name="cancellationToken">A token to cancel the lookup.</param>
     /// <returns>The full release metadata.</returns>
     /// <exception cref="MusicBrainzException">The request failed or the response couldn't be parsed.</exception>
-    public async Task<ReleaseInfo> GetReleaseAsync(string releaseId)
+    public async Task<ReleaseInfo> GetReleaseAsync(string releaseId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(releaseId);
 
         var url = $"release/{Uri.EscapeDataString(releaseId)}?fmt=json&inc=recordings+artist-credits+labels";
-        var release = await GetAsync<MbRelease>(url).ConfigureAwait(false);
+        var release = await GetAsync<MbRelease>(url, cancellationToken).ConfigureAwait(false);
 
         return ToReleaseInfo(release);
     }
@@ -105,34 +107,57 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     /// failures into <see cref="MusicBrainzException"/>. Transient failures
     /// (network error, request timeout, HTTP 429, or HTTP 5xx) are retried
     /// with exponential backoff, up to <see cref="MaxAttempts"/> attempts
-    /// total, capped at <see cref="MaxRetryDelay"/> between attempts.
-    /// Non-transient failures (e.g. HTTP 404) are not retried.
+    /// total, capped at <see cref="MaxRetryDelay"/> between attempts. A
+    /// client-side request timeout surfaces as <see cref="TaskCanceledException"/>
+    /// rather than <see cref="HttpRequestException"/> in .NET 5+, so it's
+    /// handled as its own transient-failure branch rather than folding into
+    /// <see cref="IsTransientFailure"/>. Non-transient failures (e.g. HTTP
+    /// 404) are not retried. <paramref name="cancellationToken"/> cancellation
+    /// is never treated as transient -- it propagates immediately, unwrapped,
+    /// distinguished from a timeout by comparing
+    /// <see cref="OperationCanceledException.CancellationToken"/> against the
+    /// caller's token.
     /// </summary>
     /// <typeparam name="T">The expected response shape.</typeparam>
     /// <param name="relativeUrl">The URL, relative to <see cref="BaseUrl"/>.</param>
+    /// <param name="cancellationToken">A token to cancel the request and any pending retry backoff.</param>
     /// <returns>The deserialized response.</returns>
-    private async Task<T> GetAsync<T>(string relativeUrl)
+    private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)
     {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                var result = await _httpClient.GetFromJsonAsync<T>(relativeUrl).ConfigureAwait(false);
+                var result = await _httpClient.GetFromJsonAsync<T>(relativeUrl, cancellationToken).ConfigureAwait(false);
                 return result ?? throw new MusicBrainzException($"MusicBrainz returned an empty response for '{relativeUrl}'.");
             }
             catch (HttpRequestException ex) when (attempt < MaxAttempts && IsTransientFailure(ex))
             {
                 var delay = ComputeRetryDelay(attempt);
                 _onRetry?.Invoke(attempt, MaxAttempts, delay, ex);
-                await _delayAsync(delay).ConfigureAwait(false);
+                await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException ex)
             {
                 throw new MusicBrainzException($"MusicBrainz request failed for '{relativeUrl}': {ex.Message}", ex);
             }
+            catch (TaskCanceledException ex) when (ex.CancellationToken != cancellationToken && attempt < MaxAttempts)
+            {
+                var delay = ComputeRetryDelay(attempt);
+                _onRetry?.Invoke(attempt, MaxAttempts, delay, ex);
+                await _delayAsync(delay, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TaskCanceledException ex) when (ex.CancellationToken != cancellationToken)
+            {
+                throw new MusicBrainzException($"MusicBrainz request timed out for '{relativeUrl}': {ex.Message}", ex);
+            }
             catch (JsonException ex)
             {
                 throw new MusicBrainzException($"MusicBrainz response for '{relativeUrl}' couldn't be parsed: {ex.Message}", ex);
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new MusicBrainzException($"MusicBrainz returned an unexpected response for '{relativeUrl}': {ex.Message}", ex);
             }
         }
     }

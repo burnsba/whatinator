@@ -36,11 +36,12 @@ public sealed class FlacPackager
 
     /// <summary>Packages one disc's rip output into the project's standard FLAC folder layout.</summary>
     /// <param name="options">The packaging options.</param>
+    /// <param name="cancellationToken">A token to cancel the cover art download.</param>
     /// <returns>Where everything ended up.</returns>
     /// <exception cref="ArgumentException"><paramref name="options"/>'s disc number is missing or out of range for a multi-disc release.</exception>
     /// <exception cref="DirectoryNotFoundException"><see cref="FlacPackageOptions.SourceDirectory"/> doesn't exist.</exception>
     /// <exception cref="InvalidOperationException">The source directory has no <c>.flac</c> files, or more than one <c>.log</c> file.</exception>
-    public async Task<FlacPackageResult> PackageAsync(FlacPackageOptions options)
+    public async Task<FlacPackageResult> PackageAsync(FlacPackageOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
 
@@ -69,7 +70,7 @@ public sealed class FlacPackager
 
         ReleasePackageArtifacts.Write(releaseInfo, containerDir, isMultiDisc, ".flac", options.DiscCatalogNumber);
 
-        var coverArtPath = await TryWriteCoverArtAsync(releaseInfo, containerDir).ConfigureAwait(false);
+        var coverArtPath = await TryWriteCoverArtAsync(releaseInfo, containerDir, cancellationToken).ConfigureAwait(false);
 
         return new FlacPackageResult(containerDir, discDir, movedFlacFiles.Count, logFilePath, coverArtPath);
     }
@@ -118,15 +119,16 @@ public sealed class FlacPackager
     /// <summary>Fetches and saves cover art if none is already present in <paramref name="containerDir"/>.</summary>
     /// <param name="releaseInfo">The release being packaged.</param>
     /// <param name="containerDir">The release's container folder.</param>
+    /// <param name="cancellationToken">A token to cancel the cover art download.</param>
     /// <returns>Where the cover art was saved, or <see langword="null"/> if skipped/unavailable.</returns>
-    private async Task<string?> TryWriteCoverArtAsync(ReleaseInfo releaseInfo, string containerDir)
+    private async Task<string?> TryWriteCoverArtAsync(ReleaseInfo releaseInfo, string containerDir, CancellationToken cancellationToken)
     {
         if (Directory.EnumerateFiles(containerDir, "cover.*").Any())
         {
             return null;
         }
 
-        var coverArt = await _coverArtClient.TryDownloadFrontCoverAsync(releaseInfo.MusicBrainzReleaseId).ConfigureAwait(false);
+        var coverArt = await _coverArtClient.TryDownloadFrontCoverAsync(releaseInfo.MusicBrainzReleaseId, cancellationToken).ConfigureAwait(false);
         if (coverArt is null)
         {
             return null;

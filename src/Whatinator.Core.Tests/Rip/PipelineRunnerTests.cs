@@ -64,7 +64,7 @@ public class PipelineRunnerTests
 
     private sealed class FakeCoverArtClient : ICoverArtClient
     {
-        public Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId) =>
+        public Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId, CancellationToken cancellationToken = default) =>
             Task.FromResult<CoverArtResult?>(null);
     }
 

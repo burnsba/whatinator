@@ -9,6 +9,7 @@ public interface IDiscogsClient
 {
     /// <summary>Searches Discogs for releases matching a barcode.</summary>
     /// <param name="barcode">The barcode (UPC/EAN) to search for.</param>
+    /// <param name="cancellationToken">A token to cancel the search.</param>
     /// <returns>Every matching release Discogs returns, best guess first.</returns>
-    Task<IReadOnlyList<DiscogsInfo>> SearchByBarcodeAsync(string barcode);
+    Task<IReadOnlyList<DiscogsInfo>> SearchByBarcodeAsync(string barcode, CancellationToken cancellationToken = default);
 }

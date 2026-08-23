@@ -16,8 +16,9 @@ internal static class MakeReleaseInfoCommand
     /// </summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory)
+    public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
@@ -29,7 +30,7 @@ internal static class MakeReleaseInfoCommand
         }
         else
         {
-            var resolved = await LookUpFromDiscAsync(args, httpClientFactory).ConfigureAwait(false);
+            var resolved = await LookUpFromDiscAsync(args, httpClientFactory, cancellationToken).ConfigureAwait(false);
             if (resolved is null)
             {
                 return 1;
@@ -65,8 +66,9 @@ internal static class MakeReleaseInfoCommand
     /// </summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(string[] args, IHttpClientFactory httpClientFactory)
+    internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var config = ConfigLoader.Load();
         var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
@@ -88,7 +90,7 @@ internal static class MakeReleaseInfoCommand
         ReleaseInfo releaseInfo;
         try
         {
-            var result = await service.LookupByDiscIdAsync(disc.Id).ConfigureAwait(false);
+            var result = await service.LookupByDiscIdAsync(disc.Id, cancellationToken).ConfigureAwait(false);
             switch (result.Status)
             {
                 case MetadataLookupStatus.Found:
@@ -106,7 +108,7 @@ internal static class MakeReleaseInfoCommand
                         return null;
                     }
 
-                    releaseInfo = await service.ResolveAsync(chosen.MusicBrainzReleaseId).ConfigureAwait(false);
+                    releaseInfo = await service.ResolveAsync(chosen.MusicBrainzReleaseId, cancellationToken).ConfigureAwait(false);
                     break;
                 default:
                     Console.WriteLine("No MusicBrainz release matched this disc. Known disc info:");
@@ -121,7 +123,7 @@ internal static class MakeReleaseInfoCommand
             return null;
         }
 
-        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory, config).ConfigureAwait(false);
+        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory, config, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -135,8 +137,9 @@ internal static class MakeReleaseInfoCommand
     /// <param name="releaseInfo">The MusicBrainz-resolved release to enrich.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the Discogs <see cref="HttpClient"/> from.</param>
     /// <param name="config">The loaded config, for <see cref="WhatinatorConfig.EffectiveUserAgent"/>.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns><paramref name="releaseInfo"/>, with <see cref="ReleaseInfo.Discogs"/> populated if a match was found and selected.</returns>
-    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory, WhatinatorConfig config)
+    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory, WhatinatorConfig config, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(releaseInfo.Barcode))
         {
@@ -148,7 +151,7 @@ internal static class MakeReleaseInfoCommand
         IReadOnlyList<DiscogsInfo> candidates;
         try
         {
-            candidates = await discogsClient.SearchByBarcodeAsync(releaseInfo.Barcode).ConfigureAwait(false);
+            candidates = await discogsClient.SearchByBarcodeAsync(releaseInfo.Barcode, cancellationToken).ConfigureAwait(false);
         }
         catch (DiscogsException ex)
         {

@@ -45,9 +45,10 @@ public sealed class DiscogsClient : IDiscogsClient
 
     /// <summary>Searches Discogs for releases matching a barcode.</summary>
     /// <param name="barcode">The barcode (UPC/EAN) to search for.</param>
+    /// <param name="cancellationToken">A token to cancel the search.</param>
     /// <returns>Every matching release Discogs returns, best guess first.</returns>
     /// <exception cref="DiscogsException">The request failed or the response couldn't be parsed.</exception>
-    public async Task<IReadOnlyList<DiscogsInfo>> SearchByBarcodeAsync(string barcode)
+    public async Task<IReadOnlyList<DiscogsInfo>> SearchByBarcodeAsync(string barcode, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(barcode);
 
@@ -55,7 +56,7 @@ public sealed class DiscogsClient : IDiscogsClient
 
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<DiscogsSearchResponse>(url).ConfigureAwait(false)
+            var response = await _httpClient.GetFromJsonAsync<DiscogsSearchResponse>(url, cancellationToken).ConfigureAwait(false)
                 ?? throw new DiscogsException($"Discogs returned an empty response for '{url}'.");
             return response.Results.Select(ToDiscogsInfo).ToList();
         }

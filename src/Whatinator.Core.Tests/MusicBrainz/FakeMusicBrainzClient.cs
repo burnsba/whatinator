@@ -18,9 +18,9 @@ internal sealed class FakeMusicBrainzClient : IMusicBrainzClient
 
     public int GetReleaseCallCount => _getReleaseCallCount;
 
-    public Task<IReadOnlyList<ReleaseCandidate>> LookupByDiscIdAsync(string discId) => Task.FromResult(_candidates);
+    public Task<IReadOnlyList<ReleaseCandidate>> LookupByDiscIdAsync(string discId, CancellationToken cancellationToken = default) => Task.FromResult(_candidates);
 
-    public Task<ReleaseInfo> GetReleaseAsync(string releaseId)
+    public Task<ReleaseInfo> GetReleaseAsync(string releaseId, CancellationToken cancellationToken = default)
     {
         _getReleaseCallCount++;
         return Task.FromResult(_releasesById[releaseId]);

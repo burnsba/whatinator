@@ -38,22 +38,23 @@ public sealed class CoverArtClient : ICoverArtClient
 
     /// <summary>Attempts to download a release's front cover image.</summary>
     /// <param name="musicBrainzReleaseId">The MusicBrainz release MBID.</param>
+    /// <param name="cancellationToken">A token to cancel the download.</param>
     /// <returns>The downloaded image, or <see langword="null"/> if none is available or the request failed.</returns>
-    public async Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId)
+    public async Task<CoverArtResult?> TryDownloadFrontCoverAsync(string musicBrainzReleaseId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(musicBrainzReleaseId);
 
         try
         {
             var url = $"release/{Uri.EscapeDataString(musicBrainzReleaseId)}/front";
-            using var response = await _httpClient.GetAsync(url).ConfigureAwait(false);
+            using var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
             var extension = ExtensionFor(response.Content.Headers.ContentType);
-            var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             return new CoverArtResult(bytes, extension);
         }
         catch (HttpRequestException)

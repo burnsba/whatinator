@@ -30,7 +30,7 @@ internal static class PipelineCommand
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
-        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, httpClientFactory).ConfigureAwait(false);
+        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, httpClientFactory, cancellationToken).ConfigureAwait(false);
         if (releaseInfo is null)
         {
             return 1;
@@ -128,8 +128,9 @@ internal static class PipelineCommand
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="dest">Where to write the resolved <c>releaseinfo.json</c>.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
+    /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, IHttpClientFactory httpClientFactory)
+    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
 
@@ -148,7 +149,7 @@ internal static class PipelineCommand
         }
         else
         {
-            var resolved = await MakeReleaseInfoCommand.LookUpFromDiscAsync(args, httpClientFactory).ConfigureAwait(false);
+            var resolved = await MakeReleaseInfoCommand.LookUpFromDiscAsync(args, httpClientFactory, cancellationToken).ConfigureAwait(false);
             if (resolved is null)
             {
                 return null;
