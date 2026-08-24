@@ -15,12 +15,15 @@ namespace Whatinator.Cli;
 internal sealed record CommandContext(WhatinatorConfig Config, string Device)
 {
     /// <summary>Loads the config and resolves the device for one command invocation.</summary>
-    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="options">
+    /// The caller's already-parsed options. Must have been parsed with
+    /// <c>OptionSpec.Value("--device", "-d")</c> among its specs.
+    /// </param>
     /// <returns>The resolved context.</returns>
-    public static CommandContext Resolve(string[] args)
+    public static CommandContext Resolve(ParsedOptions options)
     {
         var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var device = options.GetValue("--device") ?? config.Device;
         return new CommandContext(config, device);
     }
 

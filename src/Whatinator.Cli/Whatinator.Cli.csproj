@@ -12,4 +12,10 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Lets Whatinator.Cli.Tests exercise internal members directly (e.g.
+         ParsedOptions, CommandDispatcher) without spawning the built exe. -->
+    <InternalsVisibleTo Include="Whatinator.Cli.Tests" />
+  </ItemGroup>
+
 </Project>

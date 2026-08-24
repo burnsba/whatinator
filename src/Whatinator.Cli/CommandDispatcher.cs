@@ -40,7 +40,7 @@ internal static class CommandDispatcher
                 Console.WriteLine($"whatinator {Core.WhatinatorVersion.Current}");
                 return 0;
             case "list-device":
-                return ListDeviceCommand.Run();
+                return ListDeviceCommand.Run(rest);
             case "disc-info":
                 return await DiscInfoCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
             case "toc":
@@ -68,7 +68,7 @@ internal static class CommandDispatcher
             default:
                 Console.Error.WriteLine($"Unknown command: {command}");
                 Console.Error.WriteLine();
-                HelpFormatter.Print();
+                HelpFormatter.Print(Console.Error);
                 return 1;
         }
     }

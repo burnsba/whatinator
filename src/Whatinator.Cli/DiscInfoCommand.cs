@@ -20,10 +20,21 @@ internal static class DiscInfoCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var context = CommandContext.Resolve(args);
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device", "-d"), OptionSpec.Flag("--ask"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var context = CommandContext.Resolve(options);
         var config = context.Config;
         var device = context.Device;
-        var ask = CommandLineOptions.HasFlag(args, "--ask");
+        var ask = options.HasFlag("--ask");
 
         Disc disc;
         try
@@ -63,8 +74,11 @@ internal static class DiscInfoCommand
                             allowSkip: false);
                         if (picked is null)
                         {
+                            // Matches MakeReleaseInfoCommand's identical "no
+                            // selection made" path -- see root CLAUDE.md and
+                            // docs/backlog-completed/017-disc-info-ask-exit-code-inconsistent.md.
                             Console.Error.WriteLine("No selection made.");
-                            return 0;
+                            return 1;
                         }
 
                         chosen = picked;

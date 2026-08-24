@@ -30,7 +30,24 @@ internal static class RipCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
+        var parsedArgs = ParsedOptions.Parse(
+            args,
+            OptionSpec.Value("--releaseinfo"),
+            OptionSpec.Value("--disc"),
+            OptionSpec.Value("--device", "-d"),
+            OptionSpec.Value("--dest"),
+            OptionSpec.Flag("--keep-wav"));
+        if (parsedArgs.HasErrors)
+        {
+            foreach (var error in parsedArgs.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var releaseInfoPath = parsedArgs.GetValue("--releaseinfo");
         if (releaseInfoPath is null)
         {
             Console.Error.WriteLine("rip requires --releaseinfo <path>.");
@@ -43,17 +60,17 @@ internal static class RipCommand
             return 1;
         }
 
-        if (!CliArgumentParsing.TryParseDiscNumber(CommandLineOptions.GetValue(args, "--disc"), out var discError, out var discNumber))
+        if (!CliArgumentParsing.TryParseDiscNumber(parsedArgs.GetValue("--disc"), out var discError, out var discNumber))
         {
             Console.Error.WriteLine(discError);
             return 1;
         }
 
-        var context = CommandContext.Resolve(args);
+        var context = CommandContext.Resolve(parsedArgs);
         var config = context.Config;
         var device = context.Device;
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
-        var keepWav = CommandLineOptions.HasFlag(args, "--keep-wav");
+        var dest = parsedArgs.GetValue("--dest") ?? ".";
+        var keepWav = parsedArgs.HasFlag("--keep-wav");
         var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
         var environment = RipEnvironmentResolver.Resolve(config, drive);

@@ -27,9 +27,28 @@ internal static class PipelineCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
-        var context = CommandContext.Resolve(args);
-        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, context, httpClientFactory, cancellationToken).ConfigureAwait(false);
+        var options = ParsedOptions.Parse(
+            args,
+            OptionSpec.Value("--dest"),
+            OptionSpec.Value("--releaseinfo"),
+            OptionSpec.Value("--device", "-d"),
+            OptionSpec.Value("--multi"),
+            OptionSpec.Flag("--no-flac"),
+            OptionSpec.Flag("--no-mp3"),
+            OptionSpec.Flag("--keep-wav"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var dest = options.GetValue("--dest") ?? ".";
+        var context = CommandContext.Resolve(options);
+        var releaseInfo = await ResolveReleaseInfoAsync(options, dest, context, httpClientFactory, cancellationToken).ConfigureAwait(false);
         if (releaseInfo is null)
         {
             return 1;
@@ -38,7 +57,7 @@ internal static class PipelineCommand
         int startDisc, endDisc;
         try
         {
-            (startDisc, endDisc) = ResolveDiscRange(args, releaseInfo);
+            (startDisc, endDisc) = ResolveDiscRange(options, releaseInfo);
         }
         catch (ArgumentException ex)
         {
@@ -48,9 +67,9 @@ internal static class PipelineCommand
 
         var config = context.Config;
         var device = context.Device;
-        var noFlac = CommandLineOptions.HasFlag(args, "--no-flac");
-        var createMp3 = !CommandLineOptions.HasFlag(args, "--no-mp3") && config.MakeMp3;
-        var keepWav = CommandLineOptions.HasFlag(args, "--keep-wav");
+        var noFlac = options.HasFlag("--no-flac");
+        var createMp3 = !options.HasFlag("--no-mp3") && config.MakeMp3;
+        var keepWav = options.HasFlag("--keep-wav");
         var isMultiDisc = releaseInfo.Media.Count > 1;
         var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
@@ -124,15 +143,15 @@ internal static class PipelineCommand
     }
 
     /// <summary>Loads <c>--releaseinfo</c>, or resolves it from the disc in the drive (same as <c>make-releaseinfo</c>), and always writes a copy to <paramref name="dest"/>.</summary>
-    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="options">The caller's already-parsed options.</param>
     /// <param name="dest">Where to write the resolved <c>releaseinfo.json</c>.</param>
     /// <param name="context">The caller's already-resolved config/device, so the disc-lookup path doesn't reload the config a second time per run.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
     /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
+    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(ParsedOptions options, string dest, CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
+        var releaseInfoPath = options.GetValue("--releaseinfo");
 
         ReleaseInfo releaseInfo;
         if (releaseInfoPath is not null)
@@ -171,13 +190,13 @@ internal static class PipelineCommand
     }
 
     /// <summary>Resolves the inclusive disc range this invocation covers.</summary>
-    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="options">The caller's already-parsed options.</param>
     /// <param name="releaseInfo">The resolved release.</param>
     /// <returns>The 1-based (start, end) disc numbers, inclusive.</returns>
     /// <exception cref="ArgumentException"><c>--multi</c> is malformed or out of range for <paramref name="releaseInfo"/>.</exception>
-    private static (int Start, int End) ResolveDiscRange(string[] args, ReleaseInfo releaseInfo)
+    private static (int Start, int End) ResolveDiscRange(ParsedOptions options, ReleaseInfo releaseInfo)
     {
-        var multiArg = CommandLineOptions.GetValue(args, "--multi");
+        var multiArg = options.GetValue("--multi");
         if (multiArg is null)
         {
             return (1, releaseInfo.Media.Count);

@@ -1,6 +1,6 @@
 # Unknown-command help is written to stdout while the error goes to stderr
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

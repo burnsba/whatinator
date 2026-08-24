@@ -11,7 +11,18 @@ internal static class CompareChecksumCommand
     /// <returns>The process exit code: <c>0</c> if clean, <c>1</c> otherwise.</returns>
     public static int Run(string[] args)
     {
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--dest"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var dest = options.GetValue("--dest") ?? ".";
 
         ChecksumCompareResult result;
         try

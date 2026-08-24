@@ -10,14 +10,25 @@ internal static class IdTxtCommand
     /// <returns>The process exit code.</returns>
     public static int Run(string[] args)
     {
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--releaseinfo"), OptionSpec.Value("--dest"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var releaseInfoPath = options.GetValue("--releaseinfo");
         if (releaseInfoPath is null)
         {
             Console.Error.WriteLine("id-txt requires --releaseinfo <path>.");
             return 1;
         }
 
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
+        var dest = options.GetValue("--dest") ?? ".";
 
         if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var releaseInfo, out var loadError))
         {

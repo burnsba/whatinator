@@ -20,9 +20,24 @@ internal static class MakeReleaseInfoCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
-        var context = CommandContext.Resolve(args);
+        var options = ParsedOptions.Parse(
+            args,
+            OptionSpec.Value("--dest"),
+            OptionSpec.Value("--releaseinfo"),
+            OptionSpec.Value("--device", "-d"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var dest = options.GetValue("--dest") ?? ".";
+        var releaseInfoPath = options.GetValue("--releaseinfo");
+        var context = CommandContext.Resolve(options);
 
         ReleaseInfo releaseInfo;
         if (releaseInfoPath is not null)

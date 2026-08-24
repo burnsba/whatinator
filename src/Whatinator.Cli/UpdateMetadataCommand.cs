@@ -12,8 +12,19 @@ internal static class UpdateMetadataCommand
     /// <returns>The process exit code.</returns>
     public static int Run(string[] args)
     {
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
-        var dest = CommandLineOptions.GetValue(args, "--dest");
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--releaseinfo"), OptionSpec.Value("--dest"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var releaseInfoPath = options.GetValue("--releaseinfo");
+        var dest = options.GetValue("--dest");
         if (releaseInfoPath is null || dest is null)
         {
             Console.Error.WriteLine("update-metadata requires --releaseinfo <path> and --dest <path>.");

@@ -18,8 +18,19 @@ internal static class TocCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
-        var device = CommandContext.Resolve(args).Device;
-        var full = CommandLineOptions.HasFlag(args, "--full");
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device", "-d"), OptionSpec.Flag("--full"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var device = CommandContext.Resolve(options).Device;
+        var full = options.HasFlag("--full");
 
         var reader = new CdrdaoTocReader();
         DiscToc toc;

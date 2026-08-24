@@ -23,7 +23,14 @@ src/Whatinator.Core.Tests/      xunit tests for Core.
 src/Whatinator.LibDiscId/       P/Invoke wrapper over native libdiscid.
 src/Whatinator.LibDiscId.Tests/ xunit tests for the wrapper.
 src/Whatinator.Cli/             Console front end. Thin: one *Command.cs per verb.
-                                No test project, by design.
+                                Delegates to Whatinator.Core for everything
+                                except argument parsing/dispatch and console
+                                I/O, which is what Whatinator.Cli.Tests covers.
+src/Whatinator.Cli.Tests/       xunit tests for the CLI's pure argument
+                                parsing/dispatch logic (ParsedOptions,
+                                CommandDispatcher's error paths) -- not the
+                                individual *Command.cs files, which still need
+                                a drive/network and stay untested.
 example/                        Reference EAC log / id.txt / m3u / cue samples,
                                 kept as format targets. Not consumed by code.
 docs/plan/                      Roadmap, phase plans, decisions, demos, backlog.

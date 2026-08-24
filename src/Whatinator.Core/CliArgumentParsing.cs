@@ -8,8 +8,9 @@ namespace Whatinator.Core;
 /// Pure argument-validation and releaseinfo-loading helpers shared by
 /// <c>Whatinator.Cli</c>'s command implementations. Lives here rather than in
 /// <c>Whatinator.Cli</c> for the same reason as <see cref="CliExceptionBoundary"/>:
-/// that project has no test project by design (see root <c>CLAUDE.md</c>) --
-/// this is the testable seam the CLI commands delegate to.
+/// it needs <see cref="Metadata.ReleaseInfoFile"/> and nothing from the
+/// console/process layer, so it belongs with the rest of Core's testable
+/// logic rather than the thin CLI shell (see root <c>CLAUDE.md</c>).
 /// </summary>
 public static class CliArgumentParsing
 {

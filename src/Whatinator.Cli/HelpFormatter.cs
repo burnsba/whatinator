@@ -23,28 +23,41 @@ internal static class HelpFormatter
     /// <summary>The narrowest a description column is ever wrapped to, even on a very narrow or misreported console width.</summary>
     private const int MinDescriptionWidth = 20;
 
-    /// <summary>Prints the whole <c>--help</c> output: banner, usage line, and every section from <see cref="HelpContent.Sections"/>.</summary>
-    public static void Print()
+    /// <summary>
+    /// Prints the whole <c>--help</c> output: banner, usage line, and every
+    /// section from <see cref="HelpContent.Sections"/>.
+    /// </summary>
+    /// <param name="writer">
+    /// Where to print. Defaults to <see cref="Console.Out"/> for requested
+    /// help (<c>whatinator help</c>/<c>--help</c>/<c>-h</c>, or no
+    /// arguments); the unknown-command path in <see cref="CommandDispatcher"/>
+    /// passes <see cref="Console.Error"/> instead, since that path is an
+    /// error, not requested output -- see root <c>CLAUDE.md</c> and
+    /// <c>docs/backlog-completed/030-unknown-command-help-goes-to-stdout.md</c>.
+    /// </param>
+    public static void Print(TextWriter? writer = null)
     {
-        Console.WriteLine(
+        writer ??= Console.Out;
+
+        writer.WriteLine(
             $"whatinator {Core.WhatinatorVersion.Current} - rip CDs, convert to FLAC/MP3, and track metadata via MusicBrainz");
-        Console.WriteLine();
-        Console.WriteLine("Usage: whatinator <command> [options]");
-        Console.WriteLine();
-        Console.WriteLine("Commands:");
+        writer.WriteLine();
+        writer.WriteLine("Usage: whatinator <command> [options]");
+        writer.WriteLine();
+        writer.WriteLine("Commands:");
 
         var descriptionWidth = Math.Max(GetConsoleWidth() - WidthMargin - UsageColumnWidth, MinDescriptionWidth);
 
         foreach (var section in HelpContent.Sections)
         {
-            Console.WriteLine();
-            Console.WriteLine($"{section.Title}:");
+            writer.WriteLine();
+            writer.WriteLine($"{section.Title}:");
 
             foreach (var command in section.Commands)
             {
                 foreach (var line in FormatCommand(command, descriptionWidth))
                 {
-                    Console.WriteLine(line);
+                    writer.WriteLine(line);
                 }
             }
         }

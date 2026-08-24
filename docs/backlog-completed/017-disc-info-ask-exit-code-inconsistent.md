@@ -1,6 +1,6 @@
 # disc-info --ask exits 0 when no selection is made
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

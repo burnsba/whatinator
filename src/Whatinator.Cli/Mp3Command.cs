@@ -12,17 +12,33 @@ internal static class Mp3Command
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
-        var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
-        var source = CommandLineOptions.GetValue(args, "--source");
+        var options = ParsedOptions.Parse(
+            args,
+            OptionSpec.Value("--releaseinfo"),
+            OptionSpec.Value("--source"),
+            OptionSpec.Value("--dest"),
+            OptionSpec.Value("--disc"));
+        if (options.HasErrors)
+        {
+            foreach (var error in options.Errors)
+            {
+                Console.Error.WriteLine(error);
+            }
+
+            return 1;
+        }
+
+        var releaseInfoPath = options.GetValue("--releaseinfo");
+        var source = options.GetValue("--source");
         if (releaseInfoPath is null || source is null)
         {
             Console.Error.WriteLine("mp3 requires --releaseinfo <path> and --source <path>.");
             return 1;
         }
 
-        var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
+        var dest = options.GetValue("--dest") ?? ".";
 
-        if (!CliArgumentParsing.TryParseDiscNumber(CommandLineOptions.GetValue(args, "--disc"), out var discError, out var discNumber))
+        if (!CliArgumentParsing.TryParseDiscNumber(options.GetValue("--disc"), out var discError, out var discNumber))
         {
             Console.Error.WriteLine(discError);
             return 1;

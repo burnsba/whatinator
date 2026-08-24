@@ -4,9 +4,10 @@ namespace Whatinator.Core;
 /// Converts an unhandled exception escaping a CLI entry point into a one-line
 /// stderr message and a non-zero exit code, instead of a raw stack trace. The
 /// logic lives here rather than in <c>Whatinator.Cli</c>'s <c>Program.cs</c>
-/// because that project has no test project by design (see root
-/// <c>CLAUDE.md</c>) -- this is the testable seam <c>Program.cs</c> delegates
-/// to.
+/// so it's testable without process-level wiring (Ctrl-C handling, DI setup)
+/// getting in the way -- <c>Whatinator.Cli.Tests</c> covers CLI-level pure
+/// logic like this one's caller (<c>CommandDispatcher</c>), but `Program.cs`
+/// itself stays untested by design (see root <c>CLAUDE.md</c>).
 /// </summary>
 public static class CliExceptionBoundary
 {
