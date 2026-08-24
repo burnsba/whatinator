@@ -3,10 +3,21 @@ using System.Net.Http;
 namespace Whatinator.Cli.Tests;
 
 /// <summary>
+/// Marks tests that redirect the process-global <see cref="Console"/> streams
+/// so xunit runs them sequentially rather than in parallel with each other --
+/// see <see cref="ConsoleTestCollection"/>.
+/// </summary>
+[CollectionDefinition("Console")]
+public class ConsoleTestCollection
+{
+}
+
+/// <summary>
 /// Tests for <see cref="CommandDispatcher"/>'s error paths -- see
 /// docs/backlog-completed/006-unknown-options-silently-ignored.md and
 /// docs/backlog-completed/030-unknown-command-help-goes-to-stdout.md.
 /// </summary>
+[Collection("Console")]
 public class CommandDispatcherTests
 {
     [Fact]

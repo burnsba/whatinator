@@ -9,15 +9,27 @@ internal static class ConsolePicker
     /// <param name="candidates">The candidates to choose from.</param>
     /// <param name="describe">Formats one candidate for display.</param>
     /// <param name="allowSkip">Whether to offer a <c>[0]</c> "skip" option.</param>
+    /// <param name="isOutputRedirected">
+    /// Overrides the <see cref="Console.IsOutputRedirected"/> check, for
+    /// tests. Production callers omit this and get the real console state.
+    /// </param>
     /// <returns>
     /// The chosen candidate; <see langword="null"/> if the user skipped
     /// (only possible when <paramref name="allowSkip"/> is
-    /// <see langword="true"/>) or stdin closed (EOF) before a valid
-    /// selection was made.
+    /// <see langword="true"/>), stdin closed (EOF) before a valid selection
+    /// was made, or stdout is redirected (prompting would either hang
+    /// silently or pollute the redirected output, so this fails fast
+    /// instead of trying).
     /// </returns>
-    public static T? PromptForSelection<T>(string header, IReadOnlyList<T> candidates, Func<T, string> describe, bool allowSkip)
+    public static T? PromptForSelection<T>(string header, IReadOnlyList<T> candidates, Func<T, string> describe, bool allowSkip, bool? isOutputRedirected = null)
         where T : class
     {
+        if (isOutputRedirected ?? Console.IsOutputRedirected)
+        {
+            Console.Error.WriteLine($"{candidates.Count} candidates matched, but stdout is redirected -- cannot prompt interactively. Rerun without redirecting output to choose one.");
+            return null;
+        }
+
         Console.WriteLine(header);
         for (var i = 0; i < candidates.Count; i++)
         {
