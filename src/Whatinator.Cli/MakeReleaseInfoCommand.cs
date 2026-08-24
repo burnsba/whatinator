@@ -22,15 +22,22 @@ internal static class MakeReleaseInfoCommand
     {
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
+        var context = CommandContext.Resolve(args);
 
         ReleaseInfo releaseInfo;
         if (releaseInfoPath is not null)
         {
-            releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
+            if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var loaded, out var loadError))
+            {
+                Console.Error.WriteLine(loadError);
+                return 1;
+            }
+
+            releaseInfo = loaded;
         }
         else
         {
-            var resolved = await LookUpFromDiscAsync(args, httpClientFactory, cancellationToken).ConfigureAwait(false);
+            var resolved = await LookUpFromDiscAsync(context, httpClientFactory, cancellationToken).ConfigureAwait(false);
             if (resolved is null)
             {
                 return 1;
@@ -64,14 +71,14 @@ internal static class MakeReleaseInfoCommand
     /// resolve a release the same way <c>make-releaseinfo</c> does, without
     /// duplicating the disc-read/MusicBrainz/Discogs/picker logic.
     /// </summary>
-    /// <param name="args">Remaining arguments after the command name.</param>
+    /// <param name="context">The caller's already-resolved config/device, so this doesn't reload the config a second time per run.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
     /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
+    internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var config = context.Config;
+        var device = context.Device;
 
         Disc disc;
         try

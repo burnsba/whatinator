@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Whatinator.Core;
 using Whatinator.Core.Toc;
 
 namespace Whatinator.Cli;
@@ -19,7 +18,7 @@ internal static class TocCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? ConfigLoader.Load().Device;
+        var device = CommandContext.Resolve(args).Device;
         var full = CommandLineOptions.HasFlag(args, "--full");
 
         var reader = new CdrdaoTocReader();

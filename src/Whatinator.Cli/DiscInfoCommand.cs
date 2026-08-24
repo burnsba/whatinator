@@ -20,8 +20,9 @@ internal static class DiscInfoCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var context = CommandContext.Resolve(args);
+        var config = context.Config;
+        var device = context.Device;
         var ask = CommandLineOptions.HasFlag(args, "--ask");
 
         Disc disc;

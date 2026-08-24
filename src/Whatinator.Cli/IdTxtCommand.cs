@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Whatinator.Core;
-using Whatinator.Core.Metadata;
 
 namespace Whatinator.Cli;
 
@@ -21,14 +19,9 @@ internal static class IdTxtCommand
 
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
 
-        ReleaseInfo releaseInfo;
-        try
+        if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var releaseInfo, out var loadError))
         {
-            releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
-        }
-        catch (Exception ex) when (ex is IOException or JsonException)
-        {
-            Console.Error.WriteLine($"Failed to read {releaseInfoPath}: {ex.Message}");
+            Console.Error.WriteLine(loadError);
             return 1;
         }
 

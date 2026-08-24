@@ -1,6 +1,6 @@
 # make-releaseinfo is the one command missing the releaseinfo load guard
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

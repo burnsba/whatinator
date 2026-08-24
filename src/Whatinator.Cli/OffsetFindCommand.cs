@@ -19,8 +19,9 @@ internal static class OffsetFindCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var context = CommandContext.Resolve(args);
+        var config = context.Config;
+        var device = context.Device;
 
         // Deliberately not disposed: wraps the process's real stdout, which
         // Console.Write* below still needs to use -- same pattern as rip/mp3.
@@ -57,7 +58,7 @@ internal static class OffsetFindCommand
             return 1;
         }
 
-        var drive = OpticalDriveLocator.Enumerate().FirstOrDefault(d => d.DevicePath == device);
+        var drive = context.ResolveDrive();
         var key = WhatinatorConfig.DriveKey(drive?.Vendor, drive?.Model, drive?.Release);
         var updatedOffsets = new Dictionary<string, int>(config.ReadOffsets ?? new Dictionary<string, int>())
         {

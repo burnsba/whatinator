@@ -1,8 +1,6 @@
-using System.Text.Json;
 using Whatinator.Core;
 using Whatinator.Core.AccurateRip;
 using Whatinator.Core.CoverArt;
-using Whatinator.Core.Drive;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Rip;
 
@@ -30,7 +28,8 @@ internal static class PipelineCommand
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
-        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, httpClientFactory, cancellationToken).ConfigureAwait(false);
+        var context = CommandContext.Resolve(args);
+        var releaseInfo = await ResolveReleaseInfoAsync(args, dest, context, httpClientFactory, cancellationToken).ConfigureAwait(false);
         if (releaseInfo is null)
         {
             return 1;
@@ -47,13 +46,13 @@ internal static class PipelineCommand
             return 1;
         }
 
-        var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var config = context.Config;
+        var device = context.Device;
         var noFlac = CommandLineOptions.HasFlag(args, "--no-flac");
         var createMp3 = !CommandLineOptions.HasFlag(args, "--no-mp3") && config.MakeMp3;
         var keepWav = CommandLineOptions.HasFlag(args, "--keep-wav");
         var isMultiDisc = releaseInfo.Media.Count > 1;
-        var drive = OpticalDriveLocator.Enumerate().FirstOrDefault(d => d.DevicePath == device);
+        var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
@@ -127,29 +126,28 @@ internal static class PipelineCommand
     /// <summary>Loads <c>--releaseinfo</c>, or resolves it from the disc in the drive (same as <c>make-releaseinfo</c>), and always writes a copy to <paramref name="dest"/>.</summary>
     /// <param name="args">Remaining arguments after the command name.</param>
     /// <param name="dest">Where to write the resolved <c>releaseinfo.json</c>.</param>
+    /// <param name="context">The caller's already-resolved config/device, so the disc-lookup path doesn't reload the config a second time per run.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
     /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
+    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(string[] args, string dest, CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
         var releaseInfoPath = CommandLineOptions.GetValue(args, "--releaseinfo");
 
         ReleaseInfo releaseInfo;
         if (releaseInfoPath is not null)
         {
-            try
+            if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var loaded, out var loadError))
             {
-                releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
-            }
-            catch (Exception ex) when (ex is IOException or JsonException)
-            {
-                Console.Error.WriteLine($"Failed to read {releaseInfoPath}: {ex.Message}");
+                Console.Error.WriteLine(loadError);
                 return null;
             }
+
+            releaseInfo = loaded;
         }
         else
         {
-            var resolved = await MakeReleaseInfoCommand.LookUpFromDiscAsync(args, httpClientFactory, cancellationToken).ConfigureAwait(false);
+            var resolved = await MakeReleaseInfoCommand.LookUpFromDiscAsync(context, httpClientFactory, cancellationToken).ConfigureAwait(false);
             if (resolved is null)
             {
                 return null;

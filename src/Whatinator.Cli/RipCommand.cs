@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using System.Text.Json;
 using Whatinator.Core;
 using Whatinator.Core.AccurateRip;
-using Whatinator.Core.Drive;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Naming;
 using Whatinator.Core.Rip;
@@ -39,35 +37,24 @@ internal static class RipCommand
             return 1;
         }
 
-        ReleaseInfo releaseInfo;
-        try
+        if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var releaseInfo, out var loadError))
         {
-            releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
-        }
-        catch (Exception ex) when (ex is IOException or JsonException)
-        {
-            Console.Error.WriteLine($"Failed to read {releaseInfoPath}: {ex.Message}");
+            Console.Error.WriteLine(loadError);
             return 1;
         }
 
-        int? discNumber = null;
-        var discArg = CommandLineOptions.GetValue(args, "--disc");
-        if (discArg is not null)
+        if (!CliArgumentParsing.TryParseDiscNumber(CommandLineOptions.GetValue(args, "--disc"), out var discError, out var discNumber))
         {
-            if (!int.TryParse(discArg, out var parsed))
-            {
-                Console.Error.WriteLine($"--disc must be a number, got '{discArg}'.");
-                return 1;
-            }
-
-            discNumber = parsed;
+            Console.Error.WriteLine(discError);
+            return 1;
         }
 
-        var config = ConfigLoader.Load();
-        var device = CommandLineOptions.GetValue(args, "--device", "-d") ?? config.Device;
+        var context = CommandContext.Resolve(args);
+        var config = context.Config;
+        var device = context.Device;
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
         var keepWav = CommandLineOptions.HasFlag(args, "--keep-wav");
-        var drive = OpticalDriveLocator.Enumerate().FirstOrDefault(d => d.DevicePath == device);
+        var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 

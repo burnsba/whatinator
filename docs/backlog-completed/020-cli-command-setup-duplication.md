@@ -1,6 +1,6 @@
 # Substantial duplicated setup across the CLI command files
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

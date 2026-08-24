@@ -1,8 +1,6 @@
-using System.Text.Json;
 using Whatinator.Core;
 using Whatinator.Core.CoverArt;
 using Whatinator.Core.Flac;
-using Whatinator.Core.Metadata;
 
 namespace Whatinator.Cli;
 
@@ -26,27 +24,15 @@ internal static class FlacCommand
 
         var dest = CommandLineOptions.GetValue(args, "--dest") ?? ".";
 
-        int? discNumber = null;
-        var discArg = CommandLineOptions.GetValue(args, "--disc");
-        if (discArg is not null)
+        if (!CliArgumentParsing.TryParseDiscNumber(CommandLineOptions.GetValue(args, "--disc"), out var discError, out var discNumber))
         {
-            if (!int.TryParse(discArg, out var parsed))
-            {
-                Console.Error.WriteLine($"--disc must be a number, got '{discArg}'.");
-                return 1;
-            }
-
-            discNumber = parsed;
+            Console.Error.WriteLine(discError);
+            return 1;
         }
 
-        ReleaseInfo releaseInfo;
-        try
+        if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var releaseInfo, out var loadError))
         {
-            releaseInfo = ReleaseInfoFile.Load(releaseInfoPath);
-        }
-        catch (Exception ex) when (ex is IOException or JsonException)
-        {
-            Console.Error.WriteLine($"Failed to read {releaseInfoPath}: {ex.Message}");
+            Console.Error.WriteLine(loadError);
             return 1;
         }
 
