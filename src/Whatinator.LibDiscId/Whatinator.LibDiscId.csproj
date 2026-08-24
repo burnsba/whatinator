@@ -3,6 +3,14 @@
   <PropertyGroup>
     <!-- Required by the LibraryImport source generator's marshalling code. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lets Whatinator.LibDiscId.Tests exercise DiscReader.WrapMissingLibrary
+         directly, since the DllNotFoundException translation it verifies
+         can't be reproduced by an actual missing-library environment in CI. -->
+    <InternalsVisibleTo Include="Whatinator.LibDiscId.Tests" />
+  </ItemGroup>
 
 </Project>

@@ -39,7 +39,9 @@ internal static class DiscInfoCommand
         Disc disc;
         try
         {
+#pragma warning disable CA1416 // DiscReader is [SupportedOSPlatform("linux")]; this CLI is Linux-only in practice too (root CLAUDE.md), but isn't itself annotated -- see src/Whatinator.LibDiscId/CLAUDE.md.
             disc = DiscReader.Read(device);
+#pragma warning restore CA1416
         }
         catch (DiscIdException ex)
         {

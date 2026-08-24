@@ -1,6 +1,6 @@
 # Missing libdiscid produces a raw stack trace on first run
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

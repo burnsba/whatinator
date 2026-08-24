@@ -1,5 +1,6 @@
 namespace Whatinator.LibDiscId.Tests;
 
+#pragma warning disable CA1416 // DiscReader is [SupportedOSPlatform("linux")]; this whole test project only ever runs on Linux (see project CLAUDE.md), but isn't itself annotated.
 public class DiscReaderTests
 {
     [Theory]
@@ -43,4 +44,21 @@ public class DiscReaderTests
 
         Assert.False(string.IsNullOrWhiteSpace(device));
     }
+
+    [Fact]
+    public void WrapMissingLibrary_ReturnsActionableDiscIdException()
+    {
+        // Exercises the DllNotFoundException -> DiscIdException translation
+        // directly, since there's no way to actually reproduce a missing
+        // libdiscid0 on a machine that has it installed (which this dev
+        // machine, and CI, both do -- see the project CLAUDE.md).
+        var inner = new DllNotFoundException("Unable to load shared library 'libdiscid.so.0' or one of its dependencies.");
+
+        var wrapped = DiscReader.WrapMissingLibrary(inner);
+
+        Assert.False(string.IsNullOrWhiteSpace(wrapped.Message));
+        Assert.Contains("libdiscid0", wrapped.Message);
+        Assert.Same(inner, wrapped.InnerException);
+    }
 }
+#pragma warning restore CA1416

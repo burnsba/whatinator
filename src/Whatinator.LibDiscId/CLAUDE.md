@@ -21,11 +21,21 @@ dependency on `Whatinator.Core` -- the arrow points the other way.
 - **There is no local `discid.h`.** Signatures came from the stable, long-
   unchanged public C ABI, cross-checked with `nm -D` against the installed
   shared object. `nm -D` is the authority when adding a binding.
-- **Linux-only as written.** The name `libdiscid.so.0` cannot resolve on macOS
-  (`libdiscid.0.dylib`) or Windows (`discid.dll`). If the library isn't
-  installed, the first native call throws `DllNotFoundException`, which this
-  wrapper does **not** currently translate into a `DiscIdException` -- so it
-  surfaces to the user as a raw stack trace. Worth fixing.
+- **Linux-only, and declared as such.** `DiscReader` carries
+  `[SupportedOSPlatform("linux")]` -- the name `libdiscid.so.0` cannot resolve
+  on macOS (`libdiscid.0.dylib`) or Windows (`discid.dll`), and there is no
+  `SetDllImportResolver` fallback (deliberately -- no real non-Linux target
+  exists today). If the library isn't installed, `DiscReader.Read`,
+  `GetDefaultDevice`, and `GetNativeVersion` catch the resulting
+  `DllNotFoundException` and rethrow it as a `DiscIdException` naming the
+  Debian package (`sudo apt install libdiscid0`), via the internal
+  `DiscReader.WrapMissingLibrary` helper. Because `DiscReader` is annotated
+  and its two Linux-only callers in `Whatinator.Cli`
+  (`DiscInfoCommand`/`MakeReleaseInfoCommand`) are not, CA1416 is suppressed
+  locally at those two call sites with a `#pragma warning disable/restore` --
+  propagating the attribute through the whole CLI call graph (dispatcher,
+  `PipelineCommand`, etc.) was judged out of scope for what should stay a
+  small, contained fix.
 
 ## Key types
 
@@ -142,13 +152,19 @@ whitespace** check when touching these paths.
   conversion, `DiscIdException` constructors.
 - Argument validation that short-circuits before native code: `Read` with a
   null/empty/whitespace device throws `ArgumentException` before `discid_new`.
+- `DiscReader.WrapMissingLibrary` (the `DllNotFoundException` ->
+  `DiscIdException` translation), via `InternalsVisibleTo`. Tested by
+  constructing a `DllNotFoundException` by hand and checking the message/inner
+  exception -- there's no way to reproduce an actually-missing `libdiscid0` on
+  a machine (or CI runner) that has it installed.
 
 **Needs libdiscid installed, but no disc:**
 - `GetNativeVersion()`, `GetDefaultDevice()`.
 - `Read("/dev/nonexistent")` -- note this *does* cross into native code and
   fails at `open()`; it does not short-circuit.
-- On a machine without `libdiscid0` these fail with `DllNotFoundException`
-  rather than skipping. `dotnet test` is not hermetic here.
+- On a machine without `libdiscid0` these now fail with an actionable
+  `DiscIdException` instead of an unhandled `DllNotFoundException`, but
+  `dotnet test` is still not hermetic here -- they fail rather than skip.
 
 **Cannot be tested automatically at all:**
 - The real device-read path: a populated `Disc`, a correct disc ID, real track
