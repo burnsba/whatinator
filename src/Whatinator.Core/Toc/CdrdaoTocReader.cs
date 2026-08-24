@@ -44,19 +44,16 @@ public sealed class CdrdaoTocReader : ICdrdaoTocReader
 
         try
         {
-            using var process = new Process { StartInfo = BuildStartInfo(device, fastToc, tocFilePath) };
-            process.Start();
-
             var filter = new CdrdaoLiveOutputFilter();
-            var relayTask = RelayFilteredAsync(process.StandardError, standardOutput, filter, cancellationToken);
-            var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
+            var exitCode = await SubprocessRunner.RunAsync(
+                BuildStartInfo(device, fastToc, tocFilePath),
+                (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+                (reader, ct) => RelayFilteredAsync(reader, standardOutput, filter, ct),
+                cancellationToken).ConfigureAwait(false);
 
-            await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-            await Task.WhenAll(relayTask, drainStdoutTask).ConfigureAwait(false);
-
-            if (process.ExitCode != 0)
+            if (exitCode != 0)
             {
-                throw new InvalidOperationException($"cdrdao read-toc exited with code {process.ExitCode}.");
+                throw new InvalidOperationException($"cdrdao read-toc exited with code {exitCode}.");
             }
 
             var tocText = await File.ReadAllTextAsync(tocFilePath, cancellationToken).ConfigureAwait(false);

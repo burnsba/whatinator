@@ -31,7 +31,28 @@ namespace Whatinator.Core.Mp3;
 /// </summary>
 public sealed class Mp3Packager
 {
-    private readonly LameEncoder _lameEncoder = new();
+    private readonly ILameEncoder _lameEncoder;
+
+    /// <summary>Initializes a new instance of the <see cref="Mp3Packager"/> class.</summary>
+    public Mp3Packager()
+        : this(new LameEncoder())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Mp3Packager"/> class with
+    /// a fake <paramref name="lameEncoder"/> -- a test seam so this class's
+    /// orchestration/sequencing logic can be exercised without spawning a
+    /// real <c>lame</c> process, same intent as
+    /// <see cref="Whatinator.Core.Rip.WhatinatorRipRunner"/>'s internal
+    /// constructor.
+    /// </summary>
+    /// <param name="lameEncoder">The MP3 encoder to use.</param>
+    internal Mp3Packager(ILameEncoder lameEncoder)
+    {
+        ArgumentNullException.ThrowIfNull(lameEncoder);
+        _lameEncoder = lameEncoder;
+    }
 
     /// <summary>Encodes one disc's FLAC files into the project's standard MP3 folder layout.</summary>
     /// <param name="options">The packaging options.</param>

@@ -24,16 +24,14 @@ public static partial class CacheDefeatAnalyzer
     {
         ArgumentNullException.ThrowIfNull(device);
 
-        using var process = new Process { StartInfo = BuildStartInfo(device) };
-        process.Start();
+        string? output = null;
+        var exitCode = await SubprocessRunner.RunAsync(
+            BuildStartInfo(device),
+            (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+            async (reader, ct) => output = await reader.ReadToEndAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
 
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
-        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-        var output = await stderrTask.ConfigureAwait(false);
-        await drainStdoutTask.ConfigureAwait(false);
-
-        return Classify(process.ExitCode, output);
+        return Classify(exitCode, output ?? string.Empty);
     }
 
     /// <summary>

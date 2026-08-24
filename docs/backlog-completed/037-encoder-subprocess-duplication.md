@@ -1,6 +1,6 @@
 # FlacEncoder and LameEncoder duplicate their process-drive body; LameEncoder has no interface
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

@@ -29,16 +29,13 @@ public sealed class FlacEncoder : IFlacEncoder
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
 
-        using var process = new Process { StartInfo = BuildStartInfo(options) };
-        process.Start();
+        var exitCode = await SubprocessRunner.RunAsync(
+            BuildStartInfo(options),
+            (reader, ct) => ProcessOutputRelay.RelayAsync(reader.BaseStream, standardOutput, ct),
+            (reader, ct) => ProcessOutputRelay.RelayAsync(reader.BaseStream, standardError, ct),
+            cancellationToken).ConfigureAwait(false);
 
-        var relayOutTask = ProcessOutputRelay.RelayAsync(process.StandardOutput.BaseStream, standardOutput, cancellationToken);
-        var relayErrTask = ProcessOutputRelay.RelayAsync(process.StandardError.BaseStream, standardError, cancellationToken);
-
-        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-        await Task.WhenAll(relayOutTask, relayErrTask).ConfigureAwait(false);
-
-        return new FlacEncodeResult(process.ExitCode);
+        return new FlacEncodeResult(exitCode);
     }
 
     /// <summary>Builds the <c>flac</c> process start info for <paramref name="options"/>.</summary>

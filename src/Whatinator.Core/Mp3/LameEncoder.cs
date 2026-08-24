@@ -14,7 +14,7 @@ namespace Whatinator.Core.Mp3;
 /// (user decision, phase 007 UAT) -- cover art is still copied alongside
 /// the MP3s at the container level by <see cref="Mp3Packager"/>.
 /// </summary>
-public sealed class LameEncoder
+public sealed class LameEncoder : ILameEncoder
 {
     /// <summary>Runs <c>lame</c> with the given options, relaying its stdout/stderr live.</summary>
     /// <param name="options">The encode options.</param>
@@ -32,17 +32,14 @@ public sealed class LameEncoder
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
 
-        using var process = new Process { StartInfo = BuildStartInfo(options) };
-        process.Start();
-
         using var capturedError = new MemoryStream();
-        var relayOutTask = ProcessOutputRelay.RelayAsync(process.StandardOutput.BaseStream, standardOutput, cancellationToken);
-        var relayErrTask = ProcessOutputRelay.RelayAsync(process.StandardError.BaseStream, standardError, cancellationToken, capturedError);
+        var exitCode = await SubprocessRunner.RunAsync(
+            BuildStartInfo(options),
+            (reader, ct) => ProcessOutputRelay.RelayAsync(reader.BaseStream, standardOutput, ct),
+            (reader, ct) => ProcessOutputRelay.RelayAsync(reader.BaseStream, standardError, ct, capturedError),
+            cancellationToken).ConfigureAwait(false);
 
-        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-        await Task.WhenAll(relayOutTask, relayErrTask).ConfigureAwait(false);
-
-        return new LameEncodeResult(process.ExitCode, Encoding.UTF8.GetString(capturedError.ToArray()));
+        return new LameEncodeResult(exitCode, Encoding.UTF8.GetString(capturedError.ToArray()));
     }
 
     /// <summary>Builds the <c>lame</c> process start info for <paramref name="options"/>.</summary>

@@ -228,6 +228,31 @@ public class Mp3PackagerTests : IDisposable
         Assert.Empty(Directory.GetFiles(result.ContainerDirectory, "cover.*"));
     }
 
+    [Fact]
+    public async Task PackageAsync_WithFakeLameEncoder_EncodesEachMatchedTrackAndWritesArtifacts()
+    {
+        CreateFakeFlac(_sourceDir, "01. Artist - Track One.flac");
+        CreateFakeFlac(_sourceDir, "02. Artist - Track Two.flac");
+
+        var releaseInfo = CreateSingleDiscRelease();
+        var encoder = new FakeLameEncoder();
+        var packager = new Mp3Packager(encoder);
+        using var stdout = new MemoryStream();
+        using var stderr = new MemoryStream();
+
+        var result = await packager.PackageAsync(new Mp3PackageOptions(releaseInfo, _sourceDir, _destDir), stdout, stderr);
+
+        Assert.Equal(2, result.EncodedTrackCount);
+        Assert.Equal(2, encoder.EncodedOptions.Count);
+        Assert.Equal(1, encoder.EncodedOptions[0].TrackNumber);
+        Assert.Equal(2, encoder.EncodedOptions[1].TrackNumber);
+        Assert.All(encoder.EncodedOptions, o => Assert.Equal(2, o.TrackCount));
+        Assert.True(File.Exists(Path.Combine(result.ContainerDirectory, "01. Artist - Track One.mp3")));
+        Assert.True(File.Exists(Path.Combine(result.ContainerDirectory, "02. Artist - Track Two.mp3")));
+        Assert.True(File.Exists(Path.Combine(result.ContainerDirectory, "releaseinfo.json")));
+        Assert.True(File.Exists(result.LogFilePath));
+    }
+
     private static void CreateFakeFlac(string dir, string fileName)
     {
         var path = Path.Combine(dir, fileName);
@@ -316,5 +341,21 @@ public class Mp3PackagerTests : IDisposable
             Label: null,
             CatalogNumber: null,
             Media: [new MediumInfo(1, "Disc One", disc1Tracks), new MediumInfo(2, "Disc Two", disc2Tracks)]);
+    }
+
+    private sealed class FakeLameEncoder : ILameEncoder
+    {
+        public List<LameEncodeOptions> EncodedOptions { get; } = [];
+
+        public Task<LameEncodeResult> EncodeAsync(
+            LameEncodeOptions options,
+            Stream standardOutput,
+            Stream standardError,
+            CancellationToken cancellationToken = default)
+        {
+            EncodedOptions.Add(options);
+            File.WriteAllText(options.OutputMp3Path, "fake mp3 bytes");
+            return Task.FromResult(new LameEncodeResult(0, "fake lame stderr output"));
+        }
     }
 }

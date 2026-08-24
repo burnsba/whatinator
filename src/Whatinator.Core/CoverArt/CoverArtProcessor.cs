@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Whatinator.Core.Rip;
 
 namespace Whatinator.Core.CoverArt;
 
@@ -43,15 +44,12 @@ public static class CoverArtProcessor
         {
             await File.WriteAllBytesAsync(inputPath, original.Content).ConfigureAwait(false);
 
-            var startInfo = BuildStartInfo(inputPath, outputPath, isLossless);
-            using var process = Process.Start(startInfo);
-            if (process is null)
-            {
-                return original;
-            }
-
-            await process.WaitForExitAsync().ConfigureAwait(false);
-            if (process.ExitCode != 0 || !File.Exists(outputPath))
+            var exitCode = await SubprocessRunner.RunAsync(
+                BuildStartInfo(inputPath, outputPath, isLossless),
+                (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+                (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+                CancellationToken.None).ConfigureAwait(false);
+            if (exitCode != 0 || !File.Exists(outputPath))
             {
                 return original;
             }

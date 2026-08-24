@@ -356,17 +356,14 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         CdParanoiaProgressReporter renderer,
         CancellationToken cancellationToken)
     {
-        using var process = new Process { StartInfo = BuildStartInfo(options, outputPath) };
-        process.Start();
-
         var captured = new StringBuilder();
-        var relayTask = TeeRelayLinesAsync(process.StandardError, captured, renderer, cancellationToken);
-        var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
+        var exitCode = await SubprocessRunner.RunAsync(
+            BuildStartInfo(options, outputPath),
+            (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+            (reader, ct) => TeeRelayLinesAsync(reader, captured, renderer, ct),
+            cancellationToken).ConfigureAwait(false);
 
-        await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-        await Task.WhenAll(relayTask, drainStdoutTask).ConfigureAwait(false);
-
-        return (process.ExitCode, captured.ToString());
+        return (exitCode, captured.ToString());
     }
 
     /// <summary>Runs one test+copy cd-paranoia cycle for <paramref name="track"/>, cleaning up its scratch files regardless of outcome.</summary>
@@ -479,16 +476,14 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     {
         try
         {
-            using var process = new Process { StartInfo = BuildSoxPeakStartInfo(wavPath) };
-            process.Start();
+            string? stderrText = null;
+            var exitCode = await SubprocessRunner.RunAsync(
+                BuildSoxPeakStartInfo(wavPath),
+                (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+                async (reader, ct) => stderrText = await reader.ReadToEndAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
 
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            var drainStdoutTask = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cancellationToken);
-            await ProcessCancellation.WaitForExitOrKillAsync(process, cancellationToken).ConfigureAwait(false);
-            var stderrText = await stderrTask.ConfigureAwait(false);
-            await drainStdoutTask.ConfigureAwait(false);
-
-            return process.ExitCode == 0 ? ParsePeakLevel(stderrText) : null;
+            return exitCode == 0 ? ParsePeakLevel(stderrText!) : null;
         }
         catch (Win32Exception)
         {
