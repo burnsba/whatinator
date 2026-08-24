@@ -1,6 +1,6 @@
 # MetadataUpdater rename collides silently after already rewriting files
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
@@ -29,11 +29,11 @@ that, and nothing in the error says so.
 
 ## Acceptance Criteria
 
-- [ ] `Directory.Exists(newPath)` checked **before** any writes; fail early with a
+- [x] `Directory.Exists(newPath)` checked **before** any writes; fail early with a
       message naming both the existing folder and the intended new name.
-- [ ] The exception message mentions `releaseinfo.bak` as the revert path.
-- [ ] Ideally, validate every precondition up front so `update-metadata` either
+- [x] The exception message mentions `releaseinfo.bak` as the revert path.
+- [x] Ideally, validate every precondition up front so `update-metadata` either
       completes fully or changes nothing.
-- [ ] New test: `MetadataUpdaterTests` currently has ten tests and none for a
+- [x] New test: `MetadataUpdaterTests` currently has ten tests and none for a
       pre-existing destination folder. Add one asserting the operation fails
       before mutating the source folder.

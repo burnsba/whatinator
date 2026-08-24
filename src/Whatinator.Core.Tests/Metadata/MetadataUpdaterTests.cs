@@ -142,6 +142,25 @@ public class MetadataUpdaterTests : IDisposable
     }
 
     [Fact]
+    public void Apply_DestinationFolderAlreadyExists_ThrowsAndChangesNothing()
+    {
+        var oldRelease = CreateRelease(date: "2000-01-01");
+        var containerDir = SetUpPackagedFolder(oldRelease, ".flac");
+
+        var newRelease = oldRelease with { Date = "2005-01-01" };
+        var collidingName = ReleaseFolderNaming.ContainerFolderName(newRelease, "flac");
+        Directory.CreateDirectory(Path.Combine(_tempDir, collidingName));
+
+        var ex = Assert.Throws<IOException>(() => MetadataUpdater.Apply(newRelease, containerDir));
+        Assert.Contains(collidingName, ex.Message);
+        Assert.Contains("releaseinfo.bak", ex.Message);
+
+        Assert.False(File.Exists(Path.Combine(containerDir, "releaseinfo.bak")));
+        Assert.True(Directory.Exists(containerDir));
+        Assert.Equal("2000-01-01", ReleaseInfoFile.Load(Path.Combine(containerDir, "releaseinfo.json")).Date);
+    }
+
+    [Fact]
     public void Apply_NoExistingReleaseInfo_Throws()
     {
         var release = CreateRelease();
