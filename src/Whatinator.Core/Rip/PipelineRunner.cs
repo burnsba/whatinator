@@ -99,12 +99,9 @@ public sealed class PipelineRunner
         // when SkipFlacPackaging leaves the files there permanently.
         if (options.Environment is not null)
         {
-            var containerDir = Path.Combine(
-                options.DestinationParentDirectory,
-                ReleaseFolderNaming.ContainerFolderName(options.ReleaseInfo, "flac"));
             var eventualDiscDirectory = options.SkipFlacPackaging
                 ? rawDir
-                : isMultiDisc ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(discNumber)) : containerDir;
+                : ReleaseFolderNaming.ResolveDiscDirectory(options.ReleaseInfo, options.DestinationParentDirectory, "flac", discNumber).DiscDirectory;
             var logOptions = new EacLogOptions(
                 options.ReleaseInfo,
                 ripResult,

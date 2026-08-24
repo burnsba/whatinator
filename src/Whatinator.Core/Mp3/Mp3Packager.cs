@@ -62,8 +62,7 @@ public sealed class Mp3Packager
         var discNumber = ReleaseFolderNaming.ResolveDiscNumber(releaseInfo, options.DiscNumber);
         var medium = releaseInfo.Media.Single(m => m.Position == discNumber);
 
-        var containerDir = Path.Combine(options.DestinationParentDirectory, ReleaseFolderNaming.ContainerFolderName(releaseInfo, "mp3 v0"));
-        var discDir = isMultiDisc ? Path.Combine(containerDir, ReleaseFolderNaming.DiscFolderName(discNumber)) : containerDir;
+        var (containerDir, discDir) = ReleaseFolderNaming.ResolveDiscDirectory(releaseInfo, options.DestinationParentDirectory, "mp3 v0", discNumber);
         Directory.CreateDirectory(discDir);
 
         var flacFiles = Directory.GetFiles(options.SourceDirectory, "*.flac");

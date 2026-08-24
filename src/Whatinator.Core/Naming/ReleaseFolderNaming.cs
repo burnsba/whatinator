@@ -82,6 +82,34 @@ public static class ReleaseFolderNaming
         return FileNameSanitizer.Sanitize($"{sortArtist} - {releaseInfo.Title} [{formatTag} {year}]");
     }
 
+    /// <summary>
+    /// Resolves a release's container folder and the specific directory one
+    /// disc's files belong in -- the single source of this arithmetic, used
+    /// by <see cref="Flac.FlacPackager"/>, <see cref="Mp3.Mp3Packager"/>, and
+    /// <see cref="Rip.PipelineRunner"/> (which must predict the same disc
+    /// directory <see cref="Flac.FlacPackager"/> will produce before it runs,
+    /// to write correct rip-log <c>Filename</c> lines). Keeping this in one
+    /// place means those three call sites can't drift apart.
+    /// </summary>
+    /// <param name="releaseInfo">The release being packaged or ripped.</param>
+    /// <param name="destinationParentDirectory">The directory the release's container folder is created under.</param>
+    /// <param name="formatTag">The format tag embedded in the container folder name, e.g. <c>"flac"</c> or <c>"mp3 v0"</c>.</param>
+    /// <param name="discNumber">The 1-based disc number, already validated via <see cref="ResolveDiscNumber"/>.</param>
+    /// <returns>The release's container directory, and the directory this specific disc's files belong in (the same directory for a single-disc release).</returns>
+    public static (string ContainerDirectory, string DiscDirectory) ResolveDiscDirectory(
+        ReleaseInfo releaseInfo, string destinationParentDirectory, string formatTag, int discNumber)
+    {
+        ArgumentNullException.ThrowIfNull(releaseInfo);
+        ArgumentNullException.ThrowIfNull(destinationParentDirectory);
+        ArgumentNullException.ThrowIfNull(formatTag);
+
+        var containerDirectory = Path.Combine(destinationParentDirectory, ContainerFolderName(releaseInfo, formatTag));
+        var discDirectory = releaseInfo.Media.Count > 1
+            ? Path.Combine(containerDirectory, DiscFolderName(discNumber))
+            : containerDirectory;
+        return (containerDirectory, discDirectory);
+    }
+
     /// <summary>Resolves and validates the disc number a packaging/rip call is for.</summary>
     /// <param name="releaseInfo">The release being packaged or ripped.</param>
     /// <param name="requested">The caller-supplied disc number, if any.</param>

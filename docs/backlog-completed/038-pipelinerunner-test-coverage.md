@@ -1,6 +1,6 @@
 # PipelineRunner has almost no test coverage over its path arithmetic
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

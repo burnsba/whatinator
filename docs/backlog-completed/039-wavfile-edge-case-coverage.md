@@ -1,6 +1,6 @@
 # WavFile has no coverage for the odd-size chunk pad byte or a truncated data chunk
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

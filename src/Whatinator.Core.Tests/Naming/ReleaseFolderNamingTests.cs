@@ -1,3 +1,4 @@
+using System.Linq;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Naming;
 
@@ -106,7 +107,28 @@ public class ReleaseFolderNamingTests
         Assert.Equal(expected, ReleaseFolderNaming.ContainerFolderName(releaseInfo, formatTag));
     }
 
-    private static ReleaseInfo CreateReleaseInfo(string? date = "1992-05-12", string title = "Diva", string artist = "Annie Lennox") => new(
+    [Fact]
+    public void ResolveDiscDirectory_MultiDisc_NestsDiscFolderUnderContainer()
+    {
+        var releaseInfo = CreateReleaseInfo(date: "1992-05-12", media: [1, 2]);
+
+        var (containerDir, discDir) = ReleaseFolderNaming.ResolveDiscDirectory(releaseInfo, "/dest", "flac", discNumber: 2);
+
+        Assert.Equal(Path.Combine("/dest", "Annie Lennox - Diva [flac 1992]"), containerDir);
+        Assert.Equal(Path.Combine(containerDir, "cd2"), discDir);
+    }
+
+    [Fact]
+    public void ResolveDiscDirectory_SingleDisc_DiscDirectoryIsContainerDirectory()
+    {
+        var releaseInfo = CreateReleaseInfo(date: "1992-05-12", media: [1]);
+
+        var (containerDir, discDir) = ReleaseFolderNaming.ResolveDiscDirectory(releaseInfo, "/dest", "flac", discNumber: 1);
+
+        Assert.Equal(containerDir, discDir);
+    }
+
+    private static ReleaseInfo CreateReleaseInfo(string? date = "1992-05-12", string title = "Diva", string artist = "Annie Lennox", int[]? media = null) => new(
         MusicBrainzReleaseId: "id",
         MusicBrainzUrl: "https://musicbrainz.org/release/id",
         Artist: artist,
@@ -116,5 +138,5 @@ public class ReleaseFolderNamingTests
         Barcode: null,
         Label: null,
         CatalogNumber: null,
-        Media: []);
+        Media: (media ?? []).Select(position => new MediumInfo(position, null, [])).ToList());
 }

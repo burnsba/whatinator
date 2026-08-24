@@ -94,6 +94,12 @@ rip log; `IdTextFile.Format` renders `id.txt`; `M3uPlaylist` the playlist;
   the metadata/TOC mismatch above.
 - **`ReleaseFolderNaming.ResolveDiscNumber` is the single gate** for disc-number
   validation. Don't re-implement the "required when multi-disc" rule elsewhere.
+- **`ReleaseFolderNaming.ResolveDiscDirectory` is the single source** of the
+  container/disc-directory path arithmetic. `FlacPackager`, `Mp3Packager`, and
+  `PipelineRunner` all call it -- the last of these needs to *predict* where
+  `FlacPackager` will place files (to write correct rip-log `Filename` lines
+  before packaging runs), so keeping this in one place is what makes that
+  prediction reliable.
 - **`FileNameSanitizer` is the only path to a filesystem name.** Everything in
   `Naming/` ends with a call to it.
 - **`WavFile.ReadDataChunk` is what feeds `AccurateRipChecksum`** -- raw PCM, no

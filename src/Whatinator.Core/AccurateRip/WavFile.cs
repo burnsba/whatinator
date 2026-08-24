@@ -73,6 +73,18 @@ public static class WavFile
             var chunkId = ReadFourCc(reader);
             var chunkSize = reader.ReadUInt32();
             var chunkData = reader.ReadBytes(checked((int)chunkSize));
+            if (chunkData.Length != chunkSize)
+            {
+                // BinaryReader.ReadBytes doesn't throw on a short read -- it
+                // silently returns whatever it managed to read. Left
+                // unchecked, a truncated chunk (e.g. a rip interrupted
+                // mid-write) would feed short PCM straight into
+                // AccurateRipChecksum instead of failing loudly, breaking
+                // this class's documented "throw, don't degrade" contract.
+                throw new InvalidDataException(
+                    $"'{path}' has a truncated '{chunkId}' chunk: expected {chunkSize} bytes, found {chunkData.Length}.");
+            }
+
             if (chunkSize % 2 == 1 && stream.Position < stream.Length)
             {
                 reader.ReadByte(); // RIFF chunks are word-aligned; an odd size carries one pad byte.
