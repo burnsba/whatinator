@@ -32,4 +32,48 @@ public class FileNameSanitizerTests
 
         Assert.Equal(input, FileNameSanitizer.Sanitize(input));
     }
+
+    [Fact]
+    public void Sanitize_LeavesInternalDotsAndSpacesUnchanged()
+    {
+        const string input = "R.E.M. - Automatic for the People";
+
+        Assert.Equal(input, FileNameSanitizer.Sanitize(input));
+    }
+
+    [Fact]
+    public void Sanitize_TrimsTrailingDot()
+    {
+        Assert.Equal("Title", FileNameSanitizer.Sanitize("Title."));
+    }
+
+    [Fact]
+    public void Sanitize_TrimsTrailingSpace()
+    {
+        Assert.Equal("Title", FileNameSanitizer.Sanitize("Title "));
+    }
+
+    [Fact]
+    public void Sanitize_TrimsLeadingWhitespace()
+    {
+        Assert.Equal("Title", FileNameSanitizer.Sanitize("  Title"));
+    }
+
+    [Fact]
+    public void Sanitize_TrimsMixedTrailingDotsAndSpaces()
+    {
+        Assert.Equal("Title", FileNameSanitizer.Sanitize("Title . . "));
+    }
+
+    [Fact]
+    public void Sanitize_EmptyInput_ReturnsPlaceholder()
+    {
+        Assert.Equal("unknown", FileNameSanitizer.Sanitize(string.Empty));
+    }
+
+    [Fact]
+    public void Sanitize_WhitespaceOnlyInput_ReturnsPlaceholder()
+    {
+        Assert.Equal("unknown", FileNameSanitizer.Sanitize("   "));
+    }
 }
