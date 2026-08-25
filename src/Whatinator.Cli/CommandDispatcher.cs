@@ -59,6 +59,8 @@ internal static class CommandDispatcher
                 return await PipelineCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
             case "offset-find":
                 return await OffsetFindCommand.RunAsync(rest, httpClientFactory, cancellationToken).ConfigureAwait(false);
+            case "cache-check":
+                return await CacheCheckCommand.RunAsync(rest, cancellationToken).ConfigureAwait(false);
             case "make-checksum":
                 return MakeChecksumCommand.Run(rest);
             case "compare-checksum":

@@ -35,9 +35,9 @@ namespace Whatinator.Core;
 /// as <see cref="ReadOffsets"/> -- phase 016. <see cref="CacheDefeatAnalyzer"/>'s
 /// <c>cd-paranoia -A</c> analysis takes real drive time (a full read/timing
 /// pass over the whole disc), so it's a value looked up here rather than
-/// run automatically before every rip; a drive's entry is added by
-/// hand-editing the config file after running the analysis once, same
-/// pattern as <see cref="ReadOffsets"/> before phase 017 automates it.
+/// run automatically before every rip; <c>whatinator cache-check</c>
+/// populates a drive's entry by running the analysis once, same pattern as
+/// <see cref="ReadOffsets"/>'s <c>offset-find</c>.
 /// </param>
 /// <param name="Overreads">
 /// Each known drive's <c>--force-overread</c> support, keyed the same way as

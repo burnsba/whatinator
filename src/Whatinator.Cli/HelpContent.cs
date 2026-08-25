@@ -33,6 +33,9 @@ internal static class HelpContent
             new HelpCommand(["offset-find [--device <path>]"], [
                 new HelpParagraph("Auto-detect the drive's sample read offset against the inserted disc (must be a disc already in the AccurateRip database) and save it to the per-drive config map"),
             ]),
+            new HelpCommand(["cache-check [--device <path>]"], [
+                new HelpParagraph("Run cd-paranoia -A against the drive (a full read/timing pass over the disc -- takes real drive time) and save the audio-cache-defeat classification to the per-drive config map, overwriting any prior entry"),
+            ]),
         ]),
         new HelpSection("Catalog", [
             new HelpCommand(["disc-info [--device <path>]", "          [--ask]"], [

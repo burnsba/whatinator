@@ -1,6 +1,6 @@
 # EAC gap: CacheDefeatAnalyzer is fully built but has no CLI command
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
@@ -34,17 +34,20 @@ write path both already exist.
 
 ## Acceptance Criteria
 
-- [ ] A `cache-check [--device <path>]` command added, calling
+- [x] A `cache-check [--device <path>]` command added, calling
       `CacheDefeatAnalyzer.AnalyzeAsync` and saving the result to
       `WhatinatorConfig.CacheDefeats` under the current drive's key -- same shape
       as `offset-find`'s write to `readOffsets`.
-- [ ] Overwrites any prior entry for that drive, and says so.
-- [ ] Warns that the analysis takes real drive time (a full read/timing pass over
+- [x] Overwrites any prior entry for that drive, and says so.
+- [x] Warns that the analysis takes real drive time (a full read/timing pass over
       the disc) before starting.
-- [ ] Registered in `CommandDispatcher`, documented in `HelpContent` **and** the
+- [x] Registered in `CommandDispatcher`, documented in `HelpContent` **and** the
       README, in the Setup section next to `offset-find`.
-- [ ] README's `cacheDefeats` config row updated -- it currently says to populate
+- [x] README's `cacheDefeats` config row updated -- it currently says to populate
       by hand.
-- [ ] The rip log's "Defeat audio cache" field verified to reflect the stored
-      result.
-- [ ] Manual verification against a real drive.
+- [x] The rip log's "Defeat audio cache" field verified to reflect the stored
+      result -- confirmed via `RipEnvironmentResolver`/`WhatinatorConfig.GetCacheDefeat`,
+      which already read this config value; `cache-check` now populates it.
+- [x] Manual verification against a real drive -- ran `cache-check --device
+      /dev/sr1` against the ASUS DRW-24F1ST with a disc inserted; classified
+      `CanDefeat` and wrote it to `config.json` under the drive's key.

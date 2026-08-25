@@ -87,7 +87,7 @@ defaults are used -- you don't need to create one.
 | `makeMp3` | `true` | Whether `pipeline` creates MP3s by default (overridden by that command's own `--no-mp3`). |
 | `userAgent` | `whatinator/{version} ( bethany.whatinator@burnsba.net )` | HTTP `User-Agent` sent with every MusicBrainz/Discogs/Cover Art Archive/AccurateRip request. Computed fresh from the running version unless set here; set it to substitute your own contact address. |
 | `readOffsets` | none | Per-drive sample read offset, keyed by `"{vendor}\|{model}\|{release}"` (see `whatinator list-device` for those three values). Populated automatically by `whatinator offset-find`; can still be edited by hand if you already know a drive's offset. |
-| `cacheDefeats` | none | Per-drive audio-cache-defeat result (`"CanDefeat"`/`"CannotDefeat"`/`"Unknown"`), same key shape as `readOffsets` -- feeds the rip log's "Defeat audio cache" field. Not run automatically (a full analysis takes real drive time); populate by hand after inspecting a drive with `cd-paranoia -A`. |
+| `cacheDefeats` | none | Per-drive audio-cache-defeat result (`"CanDefeat"`/`"CannotDefeat"`/`"Unknown"`), same key shape as `readOffsets` -- feeds the rip log's "Defeat audio cache" field. Populated automatically by `whatinator cache-check` (not run automatically before every rip, since the analysis takes real drive time); can still be edited by hand if you already know a drive's result. |
 | `overreads` | none | Per-drive `--force-overread` support (`true`/`false`), same key shape as `readOffsets` -- a drive with a `true` entry gets `--force-overread` on every `rip`/`pipeline` run without needing `--overread` each time. Not every drive supports overreading (some error, some return silence), so populate by hand only after manually verifying a drive's behavior; `rip`/`pipeline --overread` forces it on for a single run regardless of this map. |
 
 ## Commands
@@ -96,6 +96,7 @@ defaults are used -- you don't need to create one.
 dotnet run --project src/Whatinator.Cli -- --help
 dotnet run --project src/Whatinator.Cli -- list-device
 dotnet run --project src/Whatinator.Cli -- offset-find --device /dev/sr1
+dotnet run --project src/Whatinator.Cli -- cache-check --device /dev/sr1
 dotnet run --project src/Whatinator.Cli -- disc-info --device /dev/sr1 --ask
 dotnet run --project src/Whatinator.Cli -- toc --device /dev/sr1
 dotnet run --project src/Whatinator.Cli -- make-releaseinfo --device /dev/sr1
@@ -117,6 +118,7 @@ One-time drive facts -- enumerate drives and calibrate a drive's sample read off
 | --- | --- |
 | `list-device` | List available optical drives. |
 | `offset-find [--device <path>]` | Auto-detect the drive's sample read offset against the disc currently inserted (must already have a real entry in the AccurateRip database -- the command says so plainly and exits 1 if it doesn't, or if the disc has fewer than 3 audio tracks). Tries a ranked list of candidate offsets (most commonly correct first, sourced from AccurateRip's own public drive-offset database) until one produces a full match, then saves it to the config file's `readOffsets` map under the current drive's key, overwriting any prior entry for that same drive. Never guesses from a partial match -- if nothing matches, it says so and suggests trying a different disc. |
+| `cache-check [--device <path>]` | Run `cd-paranoia -A` against the drive -- a full read/timing pass over the whole disc, warned about up front since it takes real drive time -- and save the audio-cache-defeat classification (`CanDefeat`/`CannotDefeat`/`Unknown`) to the config file's `cacheDefeats` map under the current drive's key, overwriting any prior entry for that same drive. Feeds the rip log's "Defeat audio cache" field. |
 
 ### Catalog
 
