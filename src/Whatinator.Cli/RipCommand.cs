@@ -36,7 +36,8 @@ internal static class RipCommand
             OptionSpec.Value("--disc"),
             OptionSpec.Value("--device"),
             OptionSpec.Value("--dest"),
-            OptionSpec.Flag("--keep-wav"));
+            OptionSpec.Flag("--keep-wav"),
+            OptionSpec.Flag("--fast-toc"));
         if (parsedArgs.HasErrors)
         {
             foreach (var error in parsedArgs.Errors)
@@ -71,6 +72,7 @@ internal static class RipCommand
         var device = context.Device;
         var dest = parsedArgs.GetValue("--dest") ?? ".";
         var keepWav = parsedArgs.HasFlag("--keep-wav");
+        var fastToc = parsedArgs.HasFlag("--fast-toc");
         var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
         var environment = RipEnvironmentResolver.Resolve(config, drive);
@@ -90,7 +92,7 @@ internal static class RipCommand
         DiscToc toc;
         try
         {
-            toc = await tocReader.ReadAsync(device, fastToc: true, standardError, cancellationToken).ConfigureAwait(false);
+            toc = await tocReader.ReadAsync(device, fastToc, standardError, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or Win32Exception)
         {

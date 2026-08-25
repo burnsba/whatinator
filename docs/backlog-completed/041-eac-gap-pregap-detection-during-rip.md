@@ -1,6 +1,6 @@
 # EAC gap: rips use --fast-toc, so pregaps are never detected
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

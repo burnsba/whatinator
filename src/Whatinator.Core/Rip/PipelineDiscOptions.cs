@@ -31,6 +31,13 @@ namespace Whatinator.Core.Rip;
 /// <see cref="RipEnvironmentInfo"/>. <see langword="null"/> skips writing a
 /// log entirely (no caller currently omits this outside tests).
 /// </param>
+/// <param name="FastToc">
+/// Whether to pass <c>fastToc: true</c> to <see cref="Toc.CdrdaoTocReader.ReadAsync"/>.
+/// Default <see langword="false"/> -- the TOC read scans every track's
+/// pregap, at the cost of roughly a second per track or more. Set
+/// <see langword="true"/> to restore the old fast read (track start/length
+/// only, track 1's pregap only) when that cost isn't worth paying.
+/// </param>
 public sealed record PipelineDiscOptions(
     ReleaseInfo ReleaseInfo,
     int? DiscNumber,
@@ -41,4 +48,5 @@ public sealed record PipelineDiscOptions(
     int? Offset = null,
     bool Overread = false,
     bool KeepWav = false,
-    RipEnvironmentInfo? Environment = null);
+    RipEnvironmentInfo? Environment = null,
+    bool FastToc = false);

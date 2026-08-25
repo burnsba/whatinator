@@ -35,7 +35,8 @@ internal static class PipelineCommand
             OptionSpec.Value("--multi"),
             OptionSpec.Flag("--no-flac"),
             OptionSpec.Flag("--no-mp3"),
-            OptionSpec.Flag("--keep-wav"));
+            OptionSpec.Flag("--keep-wav"),
+            OptionSpec.Flag("--fast-toc"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)
@@ -70,6 +71,7 @@ internal static class PipelineCommand
         var noFlac = options.HasFlag("--no-flac");
         var createMp3 = !options.HasFlag("--no-mp3") && config.MakeMp3;
         var keepWav = options.HasFlag("--keep-wav");
+        var fastToc = options.HasFlag("--fast-toc");
         var isMultiDisc = releaseInfo.Media.Count > 1;
         var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
@@ -120,7 +122,8 @@ internal static class PipelineCommand
                         createMp3,
                         readOffset,
                         KeepWav: keepWav,
-                        Environment: environment),
+                        Environment: environment,
+                        FastToc: fastToc),
                     standardOutput,
                     standardError,
                     cancellationToken).ConfigureAwait(false);

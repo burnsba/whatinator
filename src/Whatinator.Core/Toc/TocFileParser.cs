@@ -20,12 +20,18 @@ internal static partial class TocFileParser
 
     /// <summary>Parses raw <c>.toc</c> file text into a <see cref="DiscToc"/>.</summary>
     /// <param name="tocText">The full text of a <c>cdrdao read-toc</c>-produced <c>.toc</c> file.</param>
+    /// <param name="fastToc">
+    /// Whether this text came from a <c>--fast-toc</c> read -- used only to
+    /// compute <see cref="DiscTocTrack.PregapScanned"/>, since the <c>.toc</c>
+    /// text itself carries no marker distinguishing "no pregap found" from
+    /// "pregap not scanned" for tracks after the first.
+    /// </param>
     /// <returns>The parsed, frame-accurate table of contents.</returns>
     /// <exception cref="FormatException">
     /// The text isn't a recognized/supported subset of the <c>.toc</c> grammar
     /// -- a genuine parse failure is preferred over a silent wrong answer.
     /// </exception>
-    internal static DiscToc Parse(string tocText)
+    internal static DiscToc Parse(string tocText, bool fastToc)
     {
         ArgumentNullException.ThrowIfNull(tocText);
 
@@ -133,7 +139,14 @@ internal static partial class TocFileParser
                 ? builders[i + 1].TrackStartFrame + (builders[i + 1].PregapFrames ?? 0) - 1
                 : accumulatedFrames - 1;
 
-            tracks.Add(new DiscTocTrack(b.TrackNumber, startFrame, endFrame, b.IsAudio, b.PregapFrames, b.Isrc));
+            // Track 1's pregap comes straight off the raw TOC even under a
+            // fast read, so it's always "scanned"; every other track's
+            // pregap needs the audio-content scan --fast-toc skips, unless
+            // one was actually parsed anyway (defensive: trust what the data
+            // shows over the caller's flag).
+            var pregapScanned = i == 0 || !fastToc || b.PregapFrames is not null;
+
+            tracks.Add(new DiscTocTrack(b.TrackNumber, startFrame, endFrame, b.IsAudio, b.PregapFrames, b.Isrc, pregapScanned));
         }
 
         return new DiscToc(tracks, catalogNumber);

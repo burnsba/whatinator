@@ -14,17 +14,22 @@ namespace Whatinator.Core.Toc;
 /// <param name="PregapFrames">
 /// The length, in frames, of this track's pregap (the span between index 0
 /// and index 1 -- i.e. <see cref="StartFrame"/> minus this value is where the
-/// track's index 0 begins). <see langword="null"/> when
-/// <see cref="Toc.CdrdaoTocReader"/> was run with <c>fastToc: true</c> and no
-/// pregap was detected for this track -- fast mode only ever reports track
-/// 1's pregap (read directly from the disc's raw TOC, not audio-scanned);
-/// every other track's pregap requires the slow scan <c>--fast-toc</c>
-/// skips. A full-mode read that finds no pregap for a track (e.g. it starts
-/// exactly where the previous one ends) also reports <see langword="null"/>
-/// here, same as "not detected" -- there's no way to distinguish "not
-/// scanned" from "scanned, found zero" from this field alone.
+/// track's index 0 begins). <see langword="null"/> when either not scanned
+/// (see <see cref="PregapScanned"/>) or scanned and found to genuinely be
+/// zero -- use <see cref="PregapScanned"/> to tell those two cases apart,
+/// this field alone can't.
 /// </param>
 /// <param name="Isrc">
 /// This track's ISRC code, if the disc's TOC carries one -- <see langword="null"/> otherwise.
 /// </param>
-public sealed record DiscTocTrack(int TrackNumber, int StartFrame, int EndFrame, bool IsAudio, int? PregapFrames = null, string? Isrc = null);
+/// <param name="PregapScanned">
+/// Whether <see cref="PregapFrames"/> reflects a real scan of this track
+/// rather than an unscanned gap. Always <see langword="true"/> for track 1
+/// (its pregap is read directly from the disc's raw TOC, no audio scan
+/// needed) and for every track when <see cref="Toc.CdrdaoTocReader"/> was run
+/// with <c>fastToc: false</c> (a full scan). <see langword="false"/> for
+/// track 2 onward under <c>fastToc: true</c> -- fast mode skips the
+/// audio-content scan those tracks' pregaps require, so <c>null</c> there
+/// means "not scanned".
+/// </param>
+public sealed record DiscTocTrack(int TrackNumber, int StartFrame, int EndFrame, bool IsAudio, int? PregapFrames = null, string? Isrc = null, bool PregapScanned = false);

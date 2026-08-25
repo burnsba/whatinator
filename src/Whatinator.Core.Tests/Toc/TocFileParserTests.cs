@@ -233,7 +233,7 @@ public class TocFileParserTests
     [Fact]
     public void Parse_FastToc_ReturnsAllElevenTracksAsAudio()
     {
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         Assert.Equal(11, toc.Tracks.Count);
         Assert.All(toc.Tracks, t => Assert.True(t.IsAudio));
@@ -247,7 +247,7 @@ public class TocFileParserTests
     [InlineData(11, 195855, 215281)]
     public void Parse_FastToc_ComputesExpectedStartAndEndFrames(int trackNumber, int expectedStart, int expectedEnd)
     {
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         var track = toc.Tracks[trackNumber - 1];
         Assert.Equal(trackNumber, track.TrackNumber);
@@ -258,7 +258,7 @@ public class TocFileParserTests
     [Fact]
     public void Parse_FastToc_ComputesLeadoutFrame()
     {
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         Assert.Equal(215282, toc.LeadoutFrame);
     }
@@ -269,16 +269,40 @@ public class TocFileParserTests
         // --fast-toc skips index/pregap scanning for every track but the
         // first, whose leading silence is read straight off the disc's raw
         // TOC (no audio scan needed) -- see root CLAUDE.md § Gotchas.
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         Assert.Equal(32, toc.Tracks[0].PregapFrames);
         Assert.All(toc.Tracks.Skip(1), t => Assert.Null(t.PregapFrames));
     }
 
     [Fact]
+    public void Parse_FastToc_OnlyTrack1IsMarkedScanned()
+    {
+        // Fast mode reads track 1's pregap straight off the raw TOC (no scan
+        // needed) but skips the audio-content scan every other track's
+        // pregap requires -- PregapScanned distinguishes that "not scanned"
+        // from a genuine zero-length pregap.
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
+
+        Assert.True(toc.Tracks[0].PregapScanned);
+        Assert.All(toc.Tracks.Skip(1), t => Assert.False(t.PregapScanned));
+    }
+
+    [Fact]
+    public void Parse_FullToc_AllTracksAreMarkedScanned()
+    {
+        // Under a full scan every track was genuinely scanned, whether or
+        // not a pregap was found -- tracks 8/10 have no pregap but were
+        // still scanned, unlike the fast-mode case above.
+        var toc = TocFileParser.Parse(FullTocFixture, fastToc: false);
+
+        Assert.All(toc.Tracks, t => Assert.True(t.PregapScanned));
+    }
+
+    [Fact]
     public void Parse_FastToc_CapturesIsrcPerTrack()
     {
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         Assert.Equal("XXAA00000001", toc.Tracks[0].Isrc);
         Assert.Equal("XXAA00000011", toc.Tracks[10].Isrc);
@@ -287,7 +311,7 @@ public class TocFileParserTests
     [Fact]
     public void Parse_CapturesCatalogNumber_WhenPresent()
     {
-        var toc = TocFileParser.Parse(FastTocFixture);
+        var toc = TocFileParser.Parse(FastTocFixture, fastToc: true);
 
         Assert.Equal("0000000000000", toc.CatalogNumber);
     }
@@ -305,7 +329,7 @@ public class TocFileParserTests
             FILE "data.wav" 0 00:05:00
             """;
 
-        var toc = TocFileParser.Parse(tocText);
+        var toc = TocFileParser.Parse(tocText, fastToc: false);
 
         Assert.Null(toc.CatalogNumber);
     }
@@ -322,7 +346,7 @@ public class TocFileParserTests
     [InlineData(11, 128)]
     public void Parse_FullToc_CapturesPerTrackPregaps(int trackNumber, int expectedPregapFrames)
     {
-        var toc = TocFileParser.Parse(FullTocFixture);
+        var toc = TocFileParser.Parse(FullTocFixture, fastToc: false);
 
         Assert.Equal(expectedPregapFrames, toc.Tracks[trackNumber - 1].PregapFrames);
     }
@@ -335,7 +359,7 @@ public class TocFileParserTests
         // cdrdao's own live output for this disc reports no "Found pre-gap"
         // line for tracks 8/10 even under a full scan -- genuinely zero gap,
         // not "not scanned".
-        var toc = TocFileParser.Parse(FullTocFixture);
+        var toc = TocFileParser.Parse(FullTocFixture, fastToc: false);
 
         Assert.Null(toc.Tracks[trackNumber - 1].PregapFrames);
     }
@@ -346,8 +370,8 @@ public class TocFileParserTests
         // cdrdao's own "Analyzing track N: start X, length Y" summary line
         // is identical between --fast-toc and a full scan for this disc --
         // only the finer per-track pregap breakdown differs. Confirmed live.
-        var fast = TocFileParser.Parse(FastTocFixture);
-        var full = TocFileParser.Parse(FullTocFixture);
+        var fast = TocFileParser.Parse(FastTocFixture, fastToc: true);
+        var full = TocFileParser.Parse(FullTocFixture, fastToc: false);
 
         for (var i = 0; i < fast.Tracks.Count; i++)
         {
@@ -374,7 +398,7 @@ public class TocFileParserTests
             DATAFILE "data.bin" 00:03:00
             """;
 
-        var result = TocFileParser.Parse(toc);
+        var result = TocFileParser.Parse(toc, fastToc: false);
 
         Assert.Equal(2, result.Tracks.Count);
         Assert.True(result.Tracks[0].IsAudio);
@@ -401,7 +425,7 @@ public class TocFileParserTests
             FILE "data.wav" 00:02:00 00:01:00
             """;
 
-        var result = TocFileParser.Parse(toc);
+        var result = TocFileParser.Parse(toc, fastToc: false);
 
         Assert.Equal(10, result.Tracks[1].PregapFrames);
 
@@ -418,7 +442,7 @@ public class TocFileParserTests
     [Fact]
     public void Parse_EmptyText_ThrowsFormatException()
     {
-        Assert.Throws<FormatException>(() => TocFileParser.Parse(string.Empty));
+        Assert.Throws<FormatException>(() => TocFileParser.Parse(string.Empty, fastToc: false));
     }
 
     [Fact]
@@ -433,7 +457,7 @@ public class TocFileParserTests
             FILE "data.wav" 0 00:02:00
             """;
 
-        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc));
+        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc, fastToc: false));
     }
 
     [Fact]
@@ -449,7 +473,7 @@ public class TocFileParserTests
             FILE "data.wav" 0 00:02:00
             """;
 
-        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc));
+        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc, fastToc: false));
     }
 
     [Fact]
@@ -462,7 +486,7 @@ public class TocFileParserTests
         var cutoff = FastTocFixture.LastIndexOf("04:19", StringComparison.Ordinal) + 2;
         var truncated = FastTocFixture[..cutoff];
 
-        Assert.Throws<FormatException>(() => TocFileParser.Parse(truncated));
+        Assert.Throws<FormatException>(() => TocFileParser.Parse(truncated, fastToc: false));
     }
 
     [Fact]
@@ -476,6 +500,6 @@ public class TocFileParserTests
             FILE "data.wav" 0
             """;
 
-        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc));
+        Assert.Throws<FormatException>(() => TocFileParser.Parse(toc, fastToc: false));
     }
 }

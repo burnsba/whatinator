@@ -66,7 +66,7 @@ public sealed class PipelineRunner
             Directory.Delete(rawDir, recursive: true);
         }
 
-        var toc = await _tocReader.ReadAsync(options.Device, fastToc: true, standardError, cancellationToken).ConfigureAwait(false);
+        var toc = await _tocReader.ReadAsync(options.Device, options.FastToc, standardError, cancellationToken).ConfigureAwait(false);
 
         var ripOptions = new WhatinatorRipOptions(
             options.Device,

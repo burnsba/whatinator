@@ -57,7 +57,7 @@ public sealed class CdrdaoTocReader : ICdrdaoTocReader
             }
 
             var tocText = await File.ReadAllTextAsync(tocFilePath, cancellationToken).ConfigureAwait(false);
-            var toc = TocFileParser.Parse(tocText);
+            var toc = TocFileParser.Parse(tocText, fastToc);
 
             if (filter.SawCatalogLine)
             {
