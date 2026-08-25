@@ -37,7 +37,8 @@ internal static class RipCommand
             OptionSpec.Value("--device"),
             OptionSpec.Value("--dest"),
             OptionSpec.Flag("--keep-wav"),
-            OptionSpec.Flag("--fast-toc"));
+            OptionSpec.Flag("--fast-toc"),
+            OptionSpec.Flag("--overread"));
         if (parsedArgs.HasErrors)
         {
             foreach (var error in parsedArgs.Errors)
@@ -75,6 +76,7 @@ internal static class RipCommand
         var fastToc = parsedArgs.HasFlag("--fast-toc");
         var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
+        var overread = parsedArgs.HasFlag("--overread") || config.GetOverread(drive?.Vendor, drive?.Model, drive?.Release);
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
         // Deliberately not disposed: these wrap the process's real stdout/stderr,
@@ -103,7 +105,7 @@ internal static class RipCommand
         var accurateRipClient = new AccurateRipClient(httpClientFactory.CreateClient("accuraterip"));
         var runner = new WhatinatorRipRunner(accurateRipClient);
         var options = new WhatinatorRipOptions(
-            device, releaseInfo, toc, dest, DiscNumber: discNumber, Offset: offset, KeepWav: keepWav);
+            device, releaseInfo, toc, dest, DiscNumber: discNumber, Offset: offset, Overread: overread, KeepWav: keepWav);
 
         WhatinatorRipResult result;
 
@@ -142,7 +144,7 @@ internal static class RipCommand
                 environment.DriveModel,
                 environment.DriveRelease,
                 offset,
-                Overread: false,
+                overread,
                 environment.CacheDefeat,
                 environment.CdParanoiaVersion,
                 environment.CdrdaoVersion,

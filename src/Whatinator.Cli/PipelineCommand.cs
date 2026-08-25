@@ -36,7 +36,8 @@ internal static class PipelineCommand
             OptionSpec.Flag("--no-flac"),
             OptionSpec.Flag("--no-mp3"),
             OptionSpec.Flag("--keep-wav"),
-            OptionSpec.Flag("--fast-toc"));
+            OptionSpec.Flag("--fast-toc"),
+            OptionSpec.Flag("--overread"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)
@@ -75,6 +76,7 @@ internal static class PipelineCommand
         var isMultiDisc = releaseInfo.Media.Count > 1;
         var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
+        var overread = options.HasFlag("--overread") || config.GetOverread(drive?.Vendor, drive?.Model, drive?.Release);
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
         var coverArtClient = new CoverArtClient(httpClientFactory.CreateClient("coverart"));
@@ -121,6 +123,7 @@ internal static class PipelineCommand
                         noFlac,
                         createMp3,
                         readOffset,
+                        Overread: overread,
                         KeepWav: keepWav,
                         Environment: environment,
                         FastToc: fastToc),

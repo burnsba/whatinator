@@ -1,6 +1,6 @@
 # EAC gap: --force-overread is plumbed end-to-end but unreachable
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
@@ -42,14 +42,27 @@ defaulted on.
 
 ## Acceptance Criteria
 
-- [ ] `--overread` flag added to `rip` and `pipeline`, threaded through to
+- [x] `--overread` flag added to `rip` and `pipeline`, threaded through to
       `WhatinatorRipOptions.Overread` / `PipelineDiscOptions.Overread`.
-- [ ] Documented in both the README command tables and `HelpContent`.
-- [ ] The rip log's existing "Overread into Lead-In and Lead-Out" field now
+- [x] Documented in both the README command tables and `HelpContent`.
+- [x] The rip log's existing "Overread into Lead-In and Lead-Out" field now
       reflects the real setting.
-- [ ] Manual verification on a real drive: confirm the flag reaches cd-paranoia,
-      and record in a comment or the README whether this drive supports it.
-- [ ] Consider a per-drive config key alongside `readOffsets` / `cacheDefeats`,
-      since overread capability is a property of the physical drive -- same
-      keying as `WhatinatorConfig.DriveKey`.
-- [ ] New test asserting the CLI flag produces `Overread: true` in the options.
+- [x] Manual verification on a real drive: confirmed `--force-overread` reaches
+      cd-paranoia (invoked it directly with the exact flag `CdParanoiaTrackReader`
+      builds). This ASUS DRW-24F1ST does **not** support it cleanly -- see root
+      `CLAUDE.md` § "External tools misbehave in specific, known ways" for the
+      full finding (it hangs rather than erroring). Left with no `overreads`
+      entry in this dev machine's config as a result.
+- [x] Added a per-drive config key: `WhatinatorConfig.Overreads` /
+      `GetOverread`, keyed the same way as `ReadOffsets`/`CacheDefeats`. A
+      `true` entry makes `rip`/`pipeline` pass `--force-overread` without
+      needing `--overread` on every invocation; `--overread` still forces it
+      on for a single run regardless of the map.
+- [x] Test coverage: `WhatinatorConfigTests` covers `GetOverread`'s null-map/
+      no-entry/matching-entry/round-trip cases (mirroring the existing
+      `GetCacheDefeat` tests) -- the actual new logic here. The CLI-level
+      wiring in `RipCommand`/`PipelineCommand` stays untested per this
+      project's existing convention (root `CLAUDE.md`: those files "still need
+      a drive/network and stay untested"); `CdParanoiaTrackReaderTests`
+      already covered `--force-overread` reaching the process argument list
+      before this change.

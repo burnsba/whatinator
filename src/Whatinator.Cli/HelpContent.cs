@@ -69,6 +69,7 @@ internal static class HelpContent
                 new HelpOption("--no-mp3", "Skip MP3 encoding for this run"),
                 new HelpOption("--keep-wav", "Keep each track's WAV alongside its FLAC instead of deleting it"),
                 new HelpOption("--fast-toc", "Skip the per-track pregap scan (track 1's pregap only, much faster); by default every track is scanned, which costs roughly a second per track or more"),
+                new HelpOption("--overread", "Pass --force-overread to cd-paranoia (read into the lead-in/lead-out; recommended alongside a positive read offset, but not every drive supports it). Also on by default for a drive with a true entry in the config file's overreads map"),
             ]),
             new HelpCommand(["rip --releaseinfo <path>", "    [options]"], [
                 new HelpParagraph("Rip-only, one disc: cdrdao TOC read + cd-paranoia test/copy reads + flac --verify encode + AccurateRip database verification, plus an EAC-style rip log. No FLAC/MP3 packaging (run flac/mp3 after) and no metadata lookup (needs --releaseinfo). For the full rip -> FLAC -> MP3 workflow in one command, use pipeline instead."),
@@ -77,6 +78,7 @@ internal static class HelpContent
                 new HelpOption("--disc <N>", "Disc number (required if the release has more than one disc)"),
                 new HelpOption("--keep-wav", "Keep each track's WAV alongside its FLAC instead of deleting it after encode"),
                 new HelpOption("--fast-toc", "Skip the per-track pregap scan (track 1's pregap only, much faster); by default every track is scanned, which costs roughly a second per track or more"),
+                new HelpOption("--overread", "Pass --force-overread to cd-paranoia (read into the lead-in/lead-out; recommended alongside a positive read offset, but not every drive supports it). Also on by default for a drive with a true entry in the config file's overreads map"),
             ]),
             new HelpCommand(["flac --releaseinfo <path>", "     --source <path>", "     [options]"], [
                 new HelpParagraph("Package a rip's FLAC output into the project's standard folder layout (FLAC + WAV files if --keep-wav was used, plus id.txt/checksum_sha256.txt/.m3u/.cue/releaseinfo.json copy/cover art)"),

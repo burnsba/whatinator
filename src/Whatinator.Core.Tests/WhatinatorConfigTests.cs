@@ -157,4 +157,53 @@ public class WhatinatorConfigTests : IDisposable
 
         Assert.Equal(CacheDefeatResult.CanDefeat, loaded.GetCacheDefeat("ASUS", "DRW-24F1ST"));
     }
+
+    [Fact]
+    public void GetOverread_ReturnsFalse_WhenMapIsNull()
+    {
+        var config = new WhatinatorConfig();
+
+        Assert.False(config.GetOverread("ASUS", "DRW-24F1ST"));
+    }
+
+    [Fact]
+    public void GetOverread_ReturnsFalse_WhenDriveHasNoEntry()
+    {
+        var config = new WhatinatorConfig(Overreads: new Dictionary<string, bool>
+        {
+            [WhatinatorConfig.DriveKey("ASUS", "DRW-24F1ST")] = true,
+        });
+
+        Assert.False(config.GetOverread("HL-DT-ST", "DVDRAM GH24NSC0"));
+    }
+
+    [Fact]
+    public void GetOverread_ReturnsTheConfiguredValue_ForAMatchingDrive()
+    {
+        var config = new WhatinatorConfig(Overreads: new Dictionary<string, bool>
+        {
+            [WhatinatorConfig.DriveKey("ASUS", "DRW-24F1ST")] = true,
+        });
+
+        Assert.True(config.GetOverread("ASUS", "DRW-24F1ST"));
+    }
+
+    [Fact]
+    public void Overreads_RoundTripsThroughConfigLoader()
+    {
+        var path = Path.Combine(_tempDir, "config.json");
+        var original = new WhatinatorConfig(Overreads: new Dictionary<string, bool>
+        {
+            [WhatinatorConfig.DriveKey("ASUS", "DRW-24F1ST")] = true,
+        });
+
+        File.WriteAllText(path, JsonSerializer.Serialize(original, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        }));
+
+        var loaded = ConfigLoader.Load(path);
+
+        Assert.True(loaded.GetOverread("ASUS", "DRW-24F1ST"));
+    }
 }

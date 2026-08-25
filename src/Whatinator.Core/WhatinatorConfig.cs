@@ -39,12 +39,22 @@ namespace Whatinator.Core;
 /// hand-editing the config file after running the analysis once, same
 /// pattern as <see cref="ReadOffsets"/> before phase 017 automates it.
 /// </param>
+/// <param name="Overreads">
+/// Each known drive's <c>--force-overread</c> support, keyed the same way as
+/// <see cref="ReadOffsets"/>/<see cref="CacheDefeats"/>. Not every drive
+/// handles overreading past the lead-out cleanly -- some error, some return
+/// silence -- so this is opt-in per drive rather than defaulted on; an entry
+/// is added by hand-editing the config file once a drive's behavior has been
+/// manually verified. <c>rip</c>/<c>pipeline</c>'s <c>--overread</c> flag
+/// forces it on for a single run regardless of this map.
+/// </param>
 public sealed record WhatinatorConfig(
     string Device = "/dev/sr1",
     bool MakeMp3 = true,
     string? UserAgent = null,
     IReadOnlyDictionary<string, int>? ReadOffsets = null,
-    IReadOnlyDictionary<string, CacheDefeatResult>? CacheDefeats = null)
+    IReadOnlyDictionary<string, CacheDefeatResult>? CacheDefeats = null,
+    IReadOnlyDictionary<string, bool>? Overreads = null)
 {
     /// <summary>
     /// The HTTP <c>User-Agent</c> to send with outbound requests: the
@@ -80,4 +90,12 @@ public sealed record WhatinatorConfig(
         CacheDefeats is not null && CacheDefeats.TryGetValue(DriveKey(vendor, model, release), out var result)
             ? result
             : CacheDefeatResult.Unknown;
+
+    /// <summary>Looks up whether a drive is known to support <c>--force-overread</c>, by its vendor/model/release strings.</summary>
+    /// <param name="vendor">The drive's vendor string, or <see langword="null"/> if unknown.</param>
+    /// <param name="model">The drive's model string, or <see langword="null"/> if unknown.</param>
+    /// <param name="release">The drive's firmware revision, or <see langword="null"/> if unknown/not read.</param>
+    /// <returns><see langword="true"/> only if this drive has a <see langword="true"/> entry in <see cref="Overreads"/>; <see langword="false"/> otherwise, including when this drive has no entry at all.</returns>
+    public bool GetOverread(string? vendor, string? model, string? release = null) =>
+        Overreads is not null && Overreads.TryGetValue(DriveKey(vendor, model, release), out var overread) && overread;
 }

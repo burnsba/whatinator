@@ -212,6 +212,14 @@ including `AccurateRipClientTests`' captured live database response.
   and continues rather than refusing.
 - **cd-paranoia upstream bug:** ripping a disc's 99th track may fail outright.
   Also warned about.
+- **`--force-overread` support is drive-dependent, and failure isn't clean:**
+  manually verified against an ASUS DRW-24F1ST (cdparanoia 10.2/libcdio 2.2.0)
+  reading the last few hundred sectors of the final track -- the identical
+  span without `--force-overread` completed in seconds, but with it added,
+  cd-paranoia neither completed nor errored after 10+ minutes and had to be
+  killed. It doesn't fail fast, so don't assume a hang is something else. This
+  is exactly why `--overread`/`WhatinatorConfig.Overreads` are opt-in rather
+  than defaulted on -- see backlog 044.
 - Subprocess stdout/stderr are drained through `ProcessOutputRelay` while the
   process runs. Don't switch to a `WaitForExit()`-then-read shape -- that
   deadlocks on tools that fill the pipe buffer, which `cd-paranoia` will.
@@ -282,7 +290,7 @@ the TOC/ISRC startup section. Keep new output on the correct side of that line.
 
 ### Drive identity is not the device path
 
-`readOffsets` and `cacheDefeats` in the config are keyed by
+`readOffsets`, `cacheDefeats`, and `overreads` in the config are keyed by
 `WhatinatorConfig.DriveKey(vendor, model, release)` -> `"ASUS|DRW-24F1ST   b|1.00"`,
 **not** by `/dev/sr1`. A read offset is a property of the physical drive; which
 `/dev/sr*` node it enumerates as can change across boots, and this dev machine
