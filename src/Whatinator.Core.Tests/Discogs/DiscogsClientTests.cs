@@ -90,6 +90,23 @@ public class DiscogsClientTests
         await Assert.ThrowsAsync<DiscogsException>(() => client.SearchByBarcodeAsync("078221870429"));
     }
 
+    [Fact]
+    public void Constructing_DoesNotDoubleUserAgent_WhenTwoClientsShareOneHttpClient()
+    {
+        var httpClient = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.OK, """{ "results": [] }"""))
+        {
+            BaseAddress = new Uri(DiscogsClient.BaseUrl),
+        };
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("whatinator-tests/1.0 ( test@example.com )");
+
+        _ = new DiscogsClient(httpClient);
+        var headerCountAfterFirstConstruction = httpClient.DefaultRequestHeaders.UserAgent.Count;
+
+        _ = new DiscogsClient(httpClient);
+
+        Assert.Equal(headerCountAfterFirstConstruction, httpClient.DefaultRequestHeaders.UserAgent.Count);
+    }
+
     private static DiscogsClient CreateClient(HttpStatusCode statusCode, string responseBody) =>
-        new("whatinator-tests/1.0 ( test@example.com )", new HttpClient(new StubHttpMessageHandler(statusCode, responseBody)));
+        new(new HttpClient(new StubHttpMessageHandler(statusCode, responseBody)) { BaseAddress = new Uri(DiscogsClient.BaseUrl) });
 }

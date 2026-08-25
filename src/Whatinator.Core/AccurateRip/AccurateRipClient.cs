@@ -19,26 +19,27 @@ namespace Whatinator.Core.AccurateRip;
 public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLookup
 {
     /// <summary>The base URL for the AccurateRip database.</summary>
-    private const string BaseUrl = "http://www.accuraterip.com/accuraterip/";
+    public const string BaseUrl = "http://www.accuraterip.com/accuraterip/";
 
     private readonly HttpClient _httpClient;
 
     /// <summary>Initializes a new instance of the <see cref="AccurateRipClient"/> class.</summary>
-    /// <param name="userAgent">The <c>User-Agent</c> header value sent with every request.</param>
     /// <param name="httpClient">
-    /// The <see cref="HttpClient"/> to issue requests with -- owned by the
-    /// caller (typically resolved from a shared <c>IHttpClientFactory</c>),
-    /// not disposed by this class. Tests pass <c>new HttpClient(stubHandler)</c>
+    /// The <see cref="HttpClient"/> to issue requests with -- owned and
+    /// configured by the caller (typically resolved from a shared
+    /// <c>IHttpClientFactory</c>), not disposed by this class. Configuration
+    /// -- <see cref="System.Net.Http.HttpClient.BaseAddress"/> (see
+    /// <see cref="BaseUrl"/>) and the <c>User-Agent</c> header -- is entirely
+    /// the caller's responsibility; this constructor does not touch either.
+    /// Tests pass
+    /// <c>new HttpClient(stubHandler) { BaseAddress = new Uri(BaseUrl) }</c>
     /// instead of hitting the real network.
     /// </param>
-    public AccurateRipClient(string userAgent, HttpClient httpClient)
+    public AccurateRipClient(HttpClient httpClient)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(userAgent);
         ArgumentNullException.ThrowIfNull(httpClient);
 
         _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(BaseUrl);
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
     }
 
     /// <inheritdoc/>

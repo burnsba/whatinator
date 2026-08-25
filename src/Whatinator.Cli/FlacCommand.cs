@@ -52,8 +52,7 @@ internal static class FlacCommand
             return 1;
         }
 
-        var config = ConfigLoader.Load();
-        var coverArtClient = new CoverArtClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("coverart"));
+        var coverArtClient = new CoverArtClient(httpClientFactory.CreateClient("coverart"));
         var packager = new FlacPackager(coverArtClient);
 
         FlacPackageResult result;

@@ -8,6 +8,10 @@ namespace Whatinator.LibDiscId;
 /// Linux-only: the bound native library is <c>libdiscid.so.0</c>, which can
 /// only resolve via the Debian/Ubuntu <c>libdiscid0</c> package (or another
 /// distribution's equivalent) on Linux. See the project <c>CLAUDE.md</c>.
+/// Otherwise fully reentrant: this class holds no static mutable state and
+/// <see cref="Read"/> allocates its own native handle per call, so
+/// concurrent reads of different devices are safe. <see cref="GetDefaultDevice"/>
+/// is the one named exception -- see its own doc comment.
 /// </remarks>
 [SupportedOSPlatform("linux")]
 public static class DiscReader
@@ -23,6 +27,14 @@ public static class DiscReader
         "libdiscid is not installed, or is not on the dynamic linker's search path. "
         + "Install it with: sudo apt install libdiscid0 (Debian/Ubuntu) or your "
         + "distribution's libdiscid package.";
+
+    /// <summary>
+    /// Guards <see cref="GetDefaultDevice"/>'s native call -- libdiscid's
+    /// Linux backend returns <c>discid_get_default_device</c>'s string in a
+    /// shared <c>static</c> buffer, not per-call storage, so concurrent
+    /// calls are not safe without this.
+    /// </summary>
+    private static readonly object DefaultDeviceLock = new();
 
     /// <summary>
     /// Reads the TOC of the disc in <paramref name="device"/> and returns its
@@ -89,6 +101,14 @@ public static class DiscReader
     }
 
     /// <summary>Returns the platform's default optical drive device path, as reported by libdiscid.</summary>
+    /// <remarks>
+    /// libdiscid's Linux backend returns <c>discid_get_default_device</c>'s
+    /// string in a shared <c>static</c> buffer rather than per-call storage,
+    /// so this method is not safe to call concurrently with itself -- unlike
+    /// every other member of this class, see the type-level remarks. Guarded
+    /// internally with a lock rather than left as a documented-only trap,
+    /// since the call is cheap and happens at most once per run.
+    /// </remarks>
     /// <returns>The default device path.</returns>
     /// <exception cref="DiscIdException">
     /// libdiscid did not report a default device, or the native <c>libdiscid</c>
@@ -98,7 +118,12 @@ public static class DiscReader
     {
         try
         {
-            var device = Marshal.PtrToStringUTF8(NativeMethods.discid_get_default_device());
+            string? device;
+            lock (DefaultDeviceLock)
+            {
+                device = Marshal.PtrToStringUTF8(NativeMethods.discid_get_default_device());
+            }
+
             return string.IsNullOrWhiteSpace(device)
                 ? throw new DiscIdException("libdiscid did not report a default device.")
                 : device;

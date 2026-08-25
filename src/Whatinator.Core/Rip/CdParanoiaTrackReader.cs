@@ -74,7 +74,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             ?? throw new ArgumentException($"'{options.DestinationWavPath}' has no parent directory.", nameof(options));
         Directory.CreateDirectory(destinationDir);
 
-        (uint Crc32, int? Peak, double? Quality)? matched = null;
+        (uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)? matched = null;
 
         // One reporter spans every cd-paranoia invocation for this track
         // (both "test" and "copy" reads, across every retry) so its
@@ -83,7 +83,6 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         // CdParanoiaProgressReporter.
         var renderer = new CdParanoiaProgressReporter(standardOutput);
 
-        var stopwatch = Stopwatch.StartNew();
         var (success, attempts) = await RetryAsync(
             options.MaxRetries,
             async ct =>
@@ -92,10 +91,9 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
                 return matched is not null;
             },
             cancellationToken).ConfigureAwait(false);
-        stopwatch.Stop();
 
         return success && matched is not null
-            ? new CdParanoiaTrackResult(true, destinationPath, matched.Value.Crc32, matched.Value.Peak, matched.Value.Quality, attempts, stopwatch.Elapsed)
+            ? new CdParanoiaTrackResult(true, destinationPath, matched.Value.Crc32, matched.Value.Peak, matched.Value.Quality, attempts, matched.Value.TestReadElapsed)
             : new CdParanoiaTrackResult(false, null, null, null, null, attempts);
     }
 
@@ -367,8 +365,12 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     }
 
     /// <summary>Runs one test+copy cd-paranoia cycle for <paramref name="track"/>, cleaning up its scratch files regardless of outcome.</summary>
-    /// <returns>The accepted read's CRC32/peak/quality, or <see langword="null"/> on a size failure or CRC32 mismatch.</returns>
-    private static async Task<(uint Crc32, int? Peak, double? Quality)?> TryOnceAsync(
+    /// <returns>
+    /// The accepted read's CRC32/peak/quality plus the test read's own
+    /// wall-clock time (<c>TestReadElapsed</c> below), or
+    /// <see langword="null"/> on a size failure or CRC32 mismatch.
+    /// </returns>
+    private static async Task<(uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)?> TryOnceAsync(
         CdParanoiaTrackOptions options,
         DiscTocTrack track,
         string destinationDir,
@@ -383,7 +385,15 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         try
         {
             renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 1, totalReads: 2);
+
+            // Timed around the test read only, not the copy read or sox
+            // below -- see CdParanoiaTrackResult.ElapsedTime for why: this
+            // is meant to read as EAC's "Extraction speed" (single-read
+            // drive speed), not the wall-clock cost of the whole verify
+            // cycle.
+            var testReadStopwatch = Stopwatch.StartNew();
             var testRun = await RunCdParanoiaAsync(options, testPath, renderer, cancellationToken).ConfigureAwait(false);
+            testReadStopwatch.Stop();
             renderer.Complete();
             if (testRun.ExitCode != 0 || !IsExpectedSize(track, testPath))
             {
@@ -409,7 +419,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             var quality = ComputeQuality(testRun.CapturedStandardError, 0, stopOffset, track.StartFrame);
 
             File.Move(testPath, destinationPath, overwrite: true);
-            return (testCrc, peak, quality);
+            return (testCrc, peak, quality, testReadStopwatch.Elapsed);
         }
         finally
         {

@@ -1,6 +1,6 @@
 # HTTP clients mutate an HttpClient they document as caller-owned
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

@@ -9,7 +9,7 @@ namespace Whatinator.Core.MusicBrainz;
 public sealed class MusicBrainzClient : IMusicBrainzClient
 {
     /// <summary>The base URL for the MusicBrainz web service.</summary>
-    private const string BaseUrl = "https://musicbrainz.org/ws/2/";
+    public const string BaseUrl = "https://musicbrainz.org/ws/2/";
 
     /// <summary>The maximum number of attempts (the first try plus retries) for a transient failure before giving up.</summary>
     private const int MaxAttempts = 10;
@@ -25,16 +25,17 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
 
     /// <summary>Initializes a new instance of the <see cref="MusicBrainzClient"/> class.</summary>
-    /// <param name="userAgent">
-    /// The <c>User-Agent</c> header value sent with every request. MusicBrainz
-    /// requires a descriptive value identifying the application and a contact
-    /// method -- requests with a generic or missing User-Agent may be rate
-    /// limited or blocked.
-    /// </param>
     /// <param name="httpClient">
-    /// The <see cref="HttpClient"/> to issue requests with -- owned by the
-    /// caller (typically resolved from a shared <c>IHttpClientFactory</c>),
-    /// not disposed by this class. Tests pass <c>new HttpClient(stubHandler)</c>
+    /// The <see cref="HttpClient"/> to issue requests with -- owned and
+    /// configured by the caller (typically resolved from a shared
+    /// <c>IHttpClientFactory</c>), not disposed by this class. Configuration
+    /// -- <see cref="System.Net.Http.HttpClient.BaseAddress"/> (see
+    /// <see cref="BaseUrl"/>) and the <c>User-Agent</c> header MusicBrainz
+    /// requires (a descriptive value identifying the application and a
+    /// contact method -- requests with a generic or missing User-Agent may
+    /// be rate limited or blocked) -- is entirely the caller's
+    /// responsibility; this constructor does not touch either. Tests pass
+    /// <c>new HttpClient(stubHandler) { BaseAddress = new Uri(BaseUrl) }</c>
     /// instead of hitting the real network.
     /// </param>
     /// <param name="onRetry">
@@ -45,8 +46,8 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     /// surface retry progress without this class doing any console I/O
     /// itself. <see langword="null"/> to retry silently.
     /// </param>
-    public MusicBrainzClient(string userAgent, HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry = null)
-        : this(userAgent, httpClient, onRetry, (delay, cancellationToken) => Task.Delay(delay, cancellationToken))
+    public MusicBrainzClient(HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry = null)
+        : this(httpClient, onRetry, (delay, cancellationToken) => Task.Delay(delay, cancellationToken))
     {
     }
 
@@ -56,18 +57,14 @@ public sealed class MusicBrainzClient : IMusicBrainzClient
     /// <c>Whatinator.Core.Tests</c> to substitute an instant delay instead of
     /// actually waiting out the exponential backoff.
     /// </summary>
-    /// <param name="userAgent">The <c>User-Agent</c> header value sent with every request.</param>
-    /// <param name="httpClient">The <see cref="HttpClient"/> to issue requests with.</param>
+    /// <param name="httpClient">The <see cref="HttpClient"/> to issue requests with -- see the public constructor's doc comment for the configuration contract.</param>
     /// <param name="onRetry">Invoked just before each backoff wait; <see langword="null"/> to retry silently.</param>
     /// <param name="delayAsync">Replaces the real <see cref="Task.Delay(TimeSpan, CancellationToken)"/> wait between retries.</param>
-    internal MusicBrainzClient(string userAgent, HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry, Func<TimeSpan, CancellationToken, Task> delayAsync)
+    internal MusicBrainzClient(HttpClient httpClient, Action<int, int, TimeSpan, Exception>? onRetry, Func<TimeSpan, CancellationToken, Task> delayAsync)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(userAgent);
         ArgumentNullException.ThrowIfNull(httpClient);
 
         _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(BaseUrl);
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
         _onRetry = onRetry;
         _delayAsync = delayAsync;
     }

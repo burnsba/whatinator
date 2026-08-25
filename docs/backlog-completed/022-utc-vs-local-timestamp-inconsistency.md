@@ -1,6 +1,6 @@
 # Rip log timestamps are UTC while console and MP3 log are local
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

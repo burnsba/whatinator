@@ -38,7 +38,7 @@ internal static class OffsetFindCommand
         // Console.Write* below still needs to use -- same pattern as rip/mp3.
         var standardOutput = Console.OpenStandardOutput();
 
-        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var accurateRipClient = new AccurateRipClient(httpClientFactory.CreateClient("accuraterip"));
         var finder = new OffsetFinder(accurateRipClient);
 
         OffsetFindResult result;

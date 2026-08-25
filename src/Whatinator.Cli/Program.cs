@@ -1,14 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Whatinator.Cli;
 using Whatinator.Core;
-
-var services = new ServiceCollection();
-
-services.AddHttpClient();
-
-using var serviceProvider = services.BuildServiceProvider();
-
-var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+using Whatinator.Core.AccurateRip;
+using Whatinator.Core.CoverArt;
+using Whatinator.Core.Discogs;
+using Whatinator.Core.MusicBrainz;
 
 // Ctrl-C is otherwise a hard process kill: cd-paranoia/cdrdao/flac/lame keep
 // running (holding the drive or a scratch file open) and no rip log gets
@@ -25,7 +21,7 @@ Console.CancelKeyPress += (_, e) =>
 try
 {
     return await CliExceptionBoundary.RunAsync(
-        () => CommandDispatcher.RunAsync(args, httpClientFactory, cts.Token),
+        () => RunWithServicesAsync(args, cts.Token),
         Console.Error,
         showStackTrace: IsDebugEnabled(args));
 }
@@ -42,3 +38,45 @@ catch (OperationCanceledException)
 // the command for CommandDispatcher's switch to match.
 static bool IsDebugEnabled(string[] args) =>
     args.Contains("--debug") || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WHATINATOR_DEBUG"));
+
+// Loads config and wires up the named HttpClients the commands resolve via
+// IHttpClientFactory -- BaseAddress and the User-Agent header are configured
+// once here, not by the client constructors themselves (MusicBrainzClient,
+// DiscogsClient, CoverArtClient, AccurateRipClient all treat the HttpClient
+// they're given as caller-owned and caller-configured, and mutating it a
+// second time would throw once a request has gone out or double the
+// User-Agent header). Kept inside the closure CliExceptionBoundary wraps,
+// not at file top-level, so a broken config file's JsonException still gets
+// the boundary's one-line error message instead of crashing before it's
+// installed.
+static async Task<int> RunWithServicesAsync(string[] args, CancellationToken cancellationToken)
+{
+    var config = ConfigLoader.Load();
+
+    var services = new ServiceCollection();
+    services.AddHttpClient("musicbrainz", c =>
+    {
+        c.BaseAddress = new Uri(MusicBrainzClient.BaseUrl);
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(config.EffectiveUserAgent);
+    });
+    services.AddHttpClient("discogs", c =>
+    {
+        c.BaseAddress = new Uri(DiscogsClient.BaseUrl);
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(config.EffectiveUserAgent);
+    });
+    services.AddHttpClient("coverart", c =>
+    {
+        c.BaseAddress = new Uri(CoverArtClient.BaseUrl);
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(config.EffectiveUserAgent);
+    });
+    services.AddHttpClient("accuraterip", c =>
+    {
+        c.BaseAddress = new Uri(AccurateRipClient.BaseUrl);
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(config.EffectiveUserAgent);
+    });
+
+    using var serviceProvider = services.BuildServiceProvider();
+    var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+
+    return await CommandDispatcher.RunAsync(args, httpClientFactory, cancellationToken).ConfigureAwait(false);
+}

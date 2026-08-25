@@ -7,12 +7,16 @@ public class Mp3LogFileTests
     [Fact]
     public void Format_MatchesExpectedLayout()
     {
+        // A non-UTC offset, deliberately -- so a regression back to UtcNow
+        // at a call site (see PipelineRunner/RipCommand) would shift these
+        // wall-clock components and fail this test instead of passing
+        // silently.
         var info = new Mp3LogInfo(
             Uname: "Linux host 6.1.0 x86_64 GNU/Linux",
             OsPrettyName: "Debian GNU/Linux 13 (trixie)",
             LameVersion: "LAME 64bits version 3.100",
-            StartTime: new DateTimeOffset(2026, 8, 16, 9, 0, 0, TimeSpan.Zero),
-            EndTime: new DateTimeOffset(2026, 8, 16, 9, 5, 30, TimeSpan.Zero));
+            StartTime: new DateTimeOffset(2026, 8, 16, 9, 0, 0, TimeSpan.FromHours(-5)),
+            EndTime: new DateTimeOffset(2026, 8, 16, 9, 5, 30, TimeSpan.FromHours(-5)));
 
         var expected =
             $"whatinator V{WhatinatorVersion.Current} EAC-style extraction log\n" +
@@ -26,8 +30,8 @@ public class Mp3LogFileTests
             "  OS (pretty name): Debian GNU/Linux 13 (trixie)\n" +
             "  Encoder: LAME 64bits version 3.100\n" +
             "  Quality: VBR -V0 (highest quality)\n" +
-            "  Start time: 2026-08-16T09:00:00+00:00\n" +
-            "  End time: 2026-08-16T09:05:30+00:00\n";
+            "  Start time: 2026-08-16T09:00:00-05:00\n" +
+            "  End time: 2026-08-16T09:05:30-05:00\n";
 
         Assert.Equal(expected, Mp3LogFile.Format(info));
     }

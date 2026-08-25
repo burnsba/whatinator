@@ -92,7 +92,6 @@ internal static class MakeReleaseInfoCommand
     /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
     internal static async Task<ReleaseInfo?> LookUpFromDiscAsync(CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var config = context.Config;
         var device = context.Device;
 
         Disc disc;
@@ -108,7 +107,7 @@ internal static class MakeReleaseInfoCommand
             return null;
         }
 
-        var musicBrainzClient = new MusicBrainzClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("musicbrainz"), onRetry: ReportMusicBrainzRetry);
+        var musicBrainzClient = new MusicBrainzClient(httpClientFactory.CreateClient("musicbrainz"), onRetry: ReportMusicBrainzRetry);
         var service = new MetadataService(musicBrainzClient);
 
         ReleaseInfo releaseInfo;
@@ -147,7 +146,7 @@ internal static class MakeReleaseInfoCommand
             return null;
         }
 
-        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory, config, cancellationToken).ConfigureAwait(false);
+        return await EnrichWithDiscogsAsync(releaseInfo, httpClientFactory, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -160,17 +159,16 @@ internal static class MakeReleaseInfoCommand
     /// </summary>
     /// <param name="releaseInfo">The MusicBrainz-resolved release to enrich.</param>
     /// <param name="httpClientFactory">The shared factory to resolve the Discogs <see cref="HttpClient"/> from.</param>
-    /// <param name="config">The loaded config, for <see cref="WhatinatorConfig.EffectiveUserAgent"/>.</param>
     /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
     /// <returns><paramref name="releaseInfo"/>, with <see cref="ReleaseInfo.Discogs"/> populated if a match was found and selected.</returns>
-    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory, WhatinatorConfig config, CancellationToken cancellationToken)
+    private static async Task<ReleaseInfo> EnrichWithDiscogsAsync(ReleaseInfo releaseInfo, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(releaseInfo.Barcode))
         {
             return releaseInfo;
         }
 
-        var discogsClient = new DiscogsClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("discogs"));
+        var discogsClient = new DiscogsClient(httpClientFactory.CreateClient("discogs"));
 
         IReadOnlyList<DiscogsInfo> candidates;
         try

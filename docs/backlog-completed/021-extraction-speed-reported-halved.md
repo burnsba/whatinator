@@ -1,6 +1,6 @@
 # Reported extraction speed is roughly half the real speed
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

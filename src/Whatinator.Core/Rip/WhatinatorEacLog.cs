@@ -66,6 +66,33 @@ public static class WhatinatorEacLog
     /// <param name="path">The destination file path.</param>
     public static void Write(EacLogOptions options, string path) => File.WriteAllText(path, Format(options));
 
+    /// <summary>
+    /// Formats a track's extraction speed as a multiple of realtime, e.g.
+    /// <c>16.0 X</c> -- <c>internal</c> (not <c>private</c>) so its output
+    /// can be pinned directly against a known duration/elapsed pair without
+    /// spinning up a whole rip log.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="WhatinatorTrackRipResult.ElapsedTime"/> is deliberately the
+    /// accepted attempt's single test-read time, not the whole test+copy+sox
+    /// verify cycle -- this field is meant to mean the same thing EAC's own
+    /// "Extraction speed" does (single-read drive speed), not wall-clock cost.
+    /// </remarks>
+    /// <param name="track">The track whose speed to format.</param>
+    /// <param name="tocTrack">The same track's physical frame range, for the track-duration half of the ratio.</param>
+    /// <returns>The formatted speed, e.g. <c>16.0 X</c>, or <c>-</c> if <see cref="WhatinatorTrackRipResult.ElapsedTime"/> is null or non-positive.</returns>
+    internal static string FormatSpeed(WhatinatorTrackRipResult track, DiscTocTrack tocTrack)
+    {
+        if (track.ElapsedTime is not { } elapsed || elapsed.TotalSeconds <= 0)
+        {
+            return "-";
+        }
+
+        var trackSeconds = (tocTrack.EndFrame - tocTrack.StartFrame + 1) / (double)FramesPerSecond;
+        var speed = trackSeconds / elapsed.TotalSeconds;
+        return $"{speed.ToString("0.0", CultureInfo.InvariantCulture)} X";
+    }
+
     /// <summary>Appends the header block: whatinator/date identification, release, OS info, drive, and read mode.</summary>
     private static void AppendHeader(StringBuilder text, EacLogOptions o)
     {
@@ -355,19 +382,6 @@ public static class WhatinatorEacLog
 
         var percent = (peak.Value / 32768.0) * 100;
         return $"{percent.ToString("0.0", CultureInfo.InvariantCulture)} %";
-    }
-
-    /// <summary>Formats a track's extraction speed as a multiple of realtime, e.g. <c>16.0 X</c>.</summary>
-    private static string FormatSpeed(WhatinatorTrackRipResult track, DiscTocTrack tocTrack)
-    {
-        if (track.ElapsedTime is not { } elapsed || elapsed.TotalSeconds <= 0)
-        {
-            return "-";
-        }
-
-        var trackSeconds = (tocTrack.EndFrame - tocTrack.StartFrame + 1) / (double)FramesPerSecond;
-        var speed = trackSeconds / elapsed.TotalSeconds;
-        return $"{speed.ToString("0.0", CultureInfo.InvariantCulture)} X";
     }
 
     /// <summary>Appends one <c>{label,-44}: {value}</c> settings-block line.</summary>

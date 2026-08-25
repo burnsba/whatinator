@@ -10,8 +10,12 @@ namespace Whatinator.Core.Tests;
 
 public class WhatinatorEacLogTests
 {
-    private static readonly DateTimeOffset StartTime = new(2026, 8, 17, 9, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset EndTime = new(2026, 8, 17, 9, 12, 30, TimeSpan.Zero);
+    // A non-UTC offset, deliberately -- so a regression back to UtcNow at a
+    // call site (see PipelineRunner/RipCommand) would shift these wall-clock
+    // components and fail Format_IncludesHeaderDriveAndSettingsSections
+    // instead of passing silently.
+    private static readonly DateTimeOffset StartTime = new(2026, 8, 17, 9, 0, 0, TimeSpan.FromHours(-5));
+    private static readonly DateTimeOffset EndTime = new(2026, 8, 17, 9, 12, 30, TimeSpan.FromHours(-5));
 
     [Fact]
     public void Format_IncludesHeaderDriveAndSettingsSections()
@@ -257,6 +261,49 @@ public class WhatinatorEacLogTests
             }
         }
     }
+
+    [Fact]
+    public void FormatSpeed_ReturnsMultipleOfRealtime_ForKnownDurationAndElapsed()
+    {
+        // 75 audio frames = exactly 1 second of track; read in 1/16th of a
+        // second -- speed is EAC's own single-read-drive-speed meaning (see
+        // CdParanoiaTrackResult.ElapsedTime), so this pins that a 16x read
+        // reports "16.0 X" regardless of how many retries or how long the
+        // copy read/sox analysis afterward took.
+        var tocTrack = new DiscTocTrack(1, 0, 74, IsAudio: true, PregapFrames: 0);
+        var track = CreateTrackResult(ElapsedTime: TimeSpan.FromSeconds(1.0 / 16));
+
+        Assert.Equal("16.0 X", WhatinatorEacLog.FormatSpeed(track, tocTrack));
+    }
+
+    [Fact]
+    public void FormatSpeed_ReturnsPlaceholder_WhenElapsedTimeIsNull()
+    {
+        var tocTrack = new DiscTocTrack(1, 0, 74, IsAudio: true, PregapFrames: 0);
+        var track = CreateTrackResult(ElapsedTime: null);
+
+        Assert.Equal("-", WhatinatorEacLog.FormatSpeed(track, tocTrack));
+    }
+
+    [Fact]
+    public void FormatSpeed_ReturnsPlaceholder_WhenElapsedTimeIsZero()
+    {
+        var tocTrack = new DiscTocTrack(1, 0, 74, IsAudio: true, PregapFrames: 0);
+        var track = CreateTrackResult(ElapsedTime: TimeSpan.Zero);
+
+        Assert.Equal("-", WhatinatorEacLog.FormatSpeed(track, tocTrack));
+    }
+
+    private static WhatinatorTrackRipResult CreateTrackResult(TimeSpan? ElapsedTime) => new(
+        TrackNumber: 1,
+        Degraded: false,
+        FlacFilePath: "/scratch/01 - Track One.flac",
+        WavFilePath: null,
+        Crc32: 0x828BDB5E,
+        Peak: 16384,
+        Quality: 1.0,
+        Attempts: 1,
+        ElapsedTime: ElapsedTime);
 
     private static EacLogOptions CreateOptions(bool accurateRipFound = false, AccurateRipTrackMatch? match = null)
     {

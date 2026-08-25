@@ -77,10 +77,14 @@ public sealed class PipelineRunner
             Offset: options.Offset ?? 0,
             Overread: options.Overread,
             KeepWav: options.KeepWav);
-        var startTime = DateTimeOffset.UtcNow;
+
+        // Local time, deliberately -- matches RipOutputTimestamp's console
+        // prefix, Mp3Packager's log timestamps, and EAC's own convention.
+        // See root CLAUDE.md § Gotchas.
+        var startTime = DateTimeOffset.Now;
         var ripResult = await _ripRunner.RipAsync(ripOptions, standardOutput, standardError, cancellationToken)
             .ConfigureAwait(false);
-        var endTime = DateTimeOffset.UtcNow;
+        var endTime = DateTimeOffset.Now;
 
         if (!ripResult.Success && !ripResult.Degraded)
         {

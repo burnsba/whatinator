@@ -32,7 +32,6 @@ internal static class DiscInfoCommand
         }
 
         var context = CommandContext.Resolve(options);
-        var config = context.Config;
         var device = context.Device;
         var ask = options.HasFlag("--ask");
 
@@ -52,7 +51,7 @@ internal static class DiscInfoCommand
         Console.WriteLine($"Device: {device}");
         DiscInfoFormatter.Print(disc);
 
-        var musicBrainzClient = new MusicBrainzClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("musicbrainz"));
+        var musicBrainzClient = new MusicBrainzClient(httpClientFactory.CreateClient("musicbrainz"));
         var service = new MetadataService(musicBrainzClient);
 
         ReleaseInfo releaseInfo;

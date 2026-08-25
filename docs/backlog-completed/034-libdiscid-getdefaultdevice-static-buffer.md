@@ -1,6 +1,6 @@
 # discid_get_default_device returns a shared static buffer
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

@@ -280,6 +280,23 @@ public class AccurateRipClientTests
         Assert.Equal((byte)9, entries[1].Confidences[0]);
     }
 
+    [Fact]
+    public void Constructing_DoesNotDoubleUserAgent_WhenTwoClientsShareOneHttpClient()
+    {
+        var httpClient = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.NotFound, string.Empty))
+        {
+            BaseAddress = new Uri(AccurateRipClient.BaseUrl),
+        };
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("whatinator-tests/1.0 ( test@example.com )");
+
+        _ = new AccurateRipClient(httpClient);
+        var headerCountAfterFirstConstruction = httpClient.DefaultRequestHeaders.UserAgent.Count;
+
+        _ = new AccurateRipClient(httpClient);
+
+        Assert.Equal(headerCountAfterFirstConstruction, httpClient.DefaultRequestHeaders.UserAgent.Count);
+    }
+
     /// <summary>
     /// The real 11-track TOC backing <c>Fixtures/dBAR-011-...bin</c>, built
     /// from libdiscid's actual per-track offsets/lengths (MSF-based,
@@ -325,7 +342,7 @@ public class AccurateRipClientTests
     ]);
 
     private static AccurateRipClient CreateClient(HttpMessageHandler handler) =>
-        new("whatinator-tests/1.0 ( test@example.com )", new HttpClient(handler));
+        new(new HttpClient(handler) { BaseAddress = new Uri(AccurateRipClient.BaseUrl) });
 
     private static StubHttpMessageHandler BinaryResponseHandler(byte[] content) =>
         new(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(content) });

@@ -98,13 +98,17 @@ internal static class RipCommand
             return 1;
         }
 
-        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var accurateRipClient = new AccurateRipClient(httpClientFactory.CreateClient("accuraterip"));
         var runner = new WhatinatorRipRunner(accurateRipClient);
         var options = new WhatinatorRipOptions(
             device, releaseInfo, toc, dest, DiscNumber: discNumber, Offset: offset, KeepWav: keepWav);
 
         WhatinatorRipResult result;
-        var startTime = DateTimeOffset.UtcNow;
+
+        // Local time, deliberately -- matches RipOutputTimestamp's console
+        // prefix, Mp3Packager's log timestamps, and EAC's own convention.
+        // See root CLAUDE.md § Gotchas.
+        var startTime = DateTimeOffset.Now;
         try
         {
             result = await runner.RipAsync(options, standardOutput, standardError, cancellationToken).ConfigureAwait(false);
@@ -115,7 +119,7 @@ internal static class RipCommand
             return 1;
         }
 
-        var endTime = DateTimeOffset.UtcNow;
+        var endTime = DateTimeOffset.Now;
         if (result.Tracks.Count > 0)
         {
             // Written directly into dest (the rip's own output directory),

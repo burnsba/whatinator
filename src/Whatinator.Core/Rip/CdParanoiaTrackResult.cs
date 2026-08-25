@@ -27,11 +27,15 @@ namespace Whatinator.Core.Rip;
 /// </param>
 /// <param name="Attempts">How many test/copy cycles were run, whether or not the last one matched.</param>
 /// <param name="ElapsedTime">
-/// The wall-clock time taken by the whole (possibly-retried) read, or
-/// <see langword="null"/> when <see cref="Matched"/> is <see langword="false"/>.
-/// Phase 016 -- feeds the EAC-style rip log's "Extraction speed" field
-/// (<see cref="Rip.WhatinatorEacLog"/>); nothing before that phase consumed
-/// per-track timing.
+/// The wall-clock time of the accepted attempt's "test" read only --
+/// deliberately excluding the "copy" read, the <c>sox</c> peak analysis, and
+/// any earlier failed retries -- or <see langword="null"/> when
+/// <see cref="Matched"/> is <see langword="false"/>. Feeds the EAC-style rip
+/// log's "Extraction speed" field (<see cref="Rip.WhatinatorEacLog"/>),
+/// which is meant to read as EAC's own field does: single-read drive speed,
+/// not the wall-clock cost of the whole verify cycle -- timing the whole
+/// cycle instead made a clean 16x read log as roughly "8.0 X" and a
+/// three-retry track log as "2.7 X", both misleadingly low.
 /// </param>
 public sealed record CdParanoiaTrackResult(bool Matched, string? WavPath, uint? Crc32, int? Peak, double? Quality, int Attempts, TimeSpan? ElapsedTime = null)
 {

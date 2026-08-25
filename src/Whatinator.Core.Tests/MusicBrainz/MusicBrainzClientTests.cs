@@ -222,8 +222,7 @@ public class MusicBrainzClientTests
             Content = new StringContent("<html>MusicBrainz is down for maintenance</html>", System.Text.Encoding.UTF8, "text/html"),
         });
         var client = new MusicBrainzClient(
-            "whatinator-tests/1.0 ( test@example.com )",
-            new HttpClient(handler),
+            new HttpClient(handler) { BaseAddress = new Uri(MusicBrainzClient.BaseUrl) },
             onRetry: null,
             delayAsync: (_, _) => Task.CompletedTask);
 
@@ -240,8 +239,7 @@ public class MusicBrainzClientTests
         // first backoff is 1 second (BaseRetryDelay); an already-cancelled
         // token must abort that wait almost immediately.
         var client = new MusicBrainzClient(
-            "whatinator-tests/1.0 ( test@example.com )",
-            new HttpClient(new StubHttpMessageHandler(HttpStatusCode.ServiceUnavailable, string.Empty)));
+            new HttpClient(new StubHttpMessageHandler(HttpStatusCode.ServiceUnavailable, string.Empty)) { BaseAddress = new Uri(MusicBrainzClient.BaseUrl) });
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -254,17 +252,32 @@ public class MusicBrainzClientTests
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Expected the cancelled backoff to abort promptly, took {stopwatch.Elapsed}.");
     }
 
+    [Fact]
+    public void Constructing_DoesNotDoubleUserAgent_WhenTwoClientsShareOneHttpClient()
+    {
+        var httpClient = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.NotFound, string.Empty))
+        {
+            BaseAddress = new Uri(MusicBrainzClient.BaseUrl),
+        };
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("whatinator-tests/1.0 ( test@example.com )");
+
+        _ = new MusicBrainzClient(httpClient);
+        var headerCountAfterFirstConstruction = httpClient.DefaultRequestHeaders.UserAgent.Count;
+
+        _ = new MusicBrainzClient(httpClient);
+
+        Assert.Equal(headerCountAfterFirstConstruction, httpClient.DefaultRequestHeaders.UserAgent.Count);
+    }
+
     private static MusicBrainzClient CreateClient(HttpStatusCode statusCode, string responseBody) =>
         new(
-            "whatinator-tests/1.0 ( test@example.com )",
-            new HttpClient(new StubHttpMessageHandler(statusCode, responseBody)),
+            new HttpClient(new StubHttpMessageHandler(statusCode, responseBody)) { BaseAddress = new Uri(MusicBrainzClient.BaseUrl) },
             onRetry: null,
             delayAsync: (_, _) => Task.CompletedTask);
 
     private static MusicBrainzClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder, Action<int, int, TimeSpan, Exception>? onRetry = null) =>
         new(
-            "whatinator-tests/1.0 ( test@example.com )",
-            new HttpClient(new StubHttpMessageHandler(responder)),
+            new HttpClient(new StubHttpMessageHandler(responder)) { BaseAddress = new Uri(MusicBrainzClient.BaseUrl) },
             onRetry,
             delayAsync: (_, _) => Task.CompletedTask);
 }

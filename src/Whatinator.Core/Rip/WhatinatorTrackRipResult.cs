@@ -24,10 +24,12 @@ namespace Whatinator.Core.Rip;
 /// remarks) or found nothing.
 /// </param>
 /// <param name="ElapsedTime">
-/// The wall-clock time <see cref="CdParanoiaTrackReader.ReadTrackAsync"/>
-/// took for this track's (possibly-retried) read, or <see langword="null"/>
-/// when <paramref name="Degraded"/>. Phase 016 -- feeds the EAC-style rip
-/// log's "Extraction speed" field (<see cref="Rip.WhatinatorEacLog"/>).
+/// The accepted attempt's single "test" read time, from
+/// <see cref="CdParanoiaTrackResult.ElapsedTime"/> -- see that member for
+/// why the copy read/sox/retries are deliberately excluded -- or
+/// <see langword="null"/> when <paramref name="Degraded"/>. Feeds the
+/// EAC-style rip log's "Extraction speed" field
+/// (<see cref="Rip.WhatinatorEacLog"/>).
 /// </param>
 public sealed record WhatinatorTrackRipResult(
     int TrackNumber,

@@ -75,8 +75,8 @@ internal static class PipelineCommand
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
-        var coverArtClient = new CoverArtClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("coverart"));
-        var accurateRipClient = new AccurateRipClient(config.EffectiveUserAgent, httpClientFactory.CreateClient("accuraterip"));
+        var coverArtClient = new CoverArtClient(httpClientFactory.CreateClient("coverart"));
+        var accurateRipClient = new AccurateRipClient(httpClientFactory.CreateClient("accuraterip"));
         var pipelineRunner = new PipelineRunner(coverArtClient, accurateRipClient);
 
         // Deliberately not disposed: these wrap the process's real stdout/stderr,
