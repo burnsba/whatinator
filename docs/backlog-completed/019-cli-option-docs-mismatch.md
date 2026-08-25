@@ -1,6 +1,6 @@
 # Working CLI aliases are documented nowhere; -d collides with --dest
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

@@ -20,7 +20,7 @@ internal static class DiscInfoCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device", "-d"), OptionSpec.Flag("--ask"));
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device"), OptionSpec.Flag("--ask"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)

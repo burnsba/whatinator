@@ -31,7 +31,7 @@ internal static class PipelineCommand
             args,
             OptionSpec.Value("--dest"),
             OptionSpec.Value("--releaseinfo"),
-            OptionSpec.Value("--device", "-d"),
+            OptionSpec.Value("--device"),
             OptionSpec.Value("--multi"),
             OptionSpec.Flag("--no-flac"),
             OptionSpec.Flag("--no-mp3"),

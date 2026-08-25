@@ -24,10 +24,10 @@ public class ParsedOptionsTests
     [Fact]
     public void Parse_ShortName_ResolvesToLongName()
     {
-        var result = ParsedOptions.Parse(["-d", "/dev/sr0"], OptionSpec.Value("--device", "-d"));
+        var result = ParsedOptions.Parse(["-e", "value"], OptionSpec.Value("--example", "-e"));
 
         Assert.False(result.HasErrors);
-        Assert.Equal("/dev/sr0", result.GetValue("--device"));
+        Assert.Equal("value", result.GetValue("--example"));
     }
 
     [Fact]

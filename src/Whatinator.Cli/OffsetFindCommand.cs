@@ -19,7 +19,7 @@ internal static class OffsetFindCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken = default)
     {
-        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device", "-d"));
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)

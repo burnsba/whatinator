@@ -5,19 +5,19 @@ namespace Whatinator.Cli;
 
 /// <summary>
 /// Config and device resolution shared by every command: reads the config
-/// file once per invocation and applies the standard <c>--device</c>/<c>-d</c>
+/// file once per invocation and applies the standard <c>--device</c>
 /// override, rather than each command re-deriving it independently (some
 /// inline inside a <c>??</c>, some via a held local -- see the CLI
 /// duplication backlog item).
 /// </summary>
 /// <param name="Config">The loaded config.</param>
-/// <param name="Device">The device path to use: <c>--device</c>/<c>-d</c> if given, else <see cref="WhatinatorConfig.Device"/>.</param>
+/// <param name="Device">The device path to use: <c>--device</c> if given, else <see cref="WhatinatorConfig.Device"/>.</param>
 internal sealed record CommandContext(WhatinatorConfig Config, string Device)
 {
     /// <summary>Loads the config and resolves the device for one command invocation.</summary>
     /// <param name="options">
     /// The caller's already-parsed options. Must have been parsed with
-    /// <c>OptionSpec.Value("--device", "-d")</c> among its specs.
+    /// <c>OptionSpec.Value("--device")</c> among its specs.
     /// </param>
     /// <returns>The resolved context.</returns>
     public static CommandContext Resolve(ParsedOptions options)

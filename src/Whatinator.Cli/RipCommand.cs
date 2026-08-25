@@ -34,7 +34,7 @@ internal static class RipCommand
             args,
             OptionSpec.Value("--releaseinfo"),
             OptionSpec.Value("--disc"),
-            OptionSpec.Value("--device", "-d"),
+            OptionSpec.Value("--device"),
             OptionSpec.Value("--dest"),
             OptionSpec.Flag("--keep-wav"));
         if (parsedArgs.HasErrors)

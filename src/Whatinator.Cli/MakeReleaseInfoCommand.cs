@@ -24,7 +24,7 @@ internal static class MakeReleaseInfoCommand
             args,
             OptionSpec.Value("--dest"),
             OptionSpec.Value("--releaseinfo"),
-            OptionSpec.Value("--device", "-d"));
+            OptionSpec.Value("--device"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)

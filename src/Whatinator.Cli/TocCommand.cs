@@ -18,7 +18,7 @@ internal static class TocCommand
     /// <returns>The process exit code.</returns>
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
-        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device", "-d"), OptionSpec.Flag("--full"));
+        var options = ParsedOptions.Parse(args, OptionSpec.Value("--device"), OptionSpec.Flag("--full"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)
