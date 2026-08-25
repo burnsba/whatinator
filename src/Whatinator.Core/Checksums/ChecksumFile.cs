@@ -50,6 +50,16 @@ public static class ChecksumFile
     /// <paramref name="directory"/> and compares it against what's
     /// actually on disk, recursively.
     /// </summary>
+    /// <remarks>
+    /// Each manifest entry's resolved path is checked against
+    /// <paramref name="directory"/> before it is read or hashed -- an entry
+    /// containing <c>..</c> traversal, or an absolute path, is reported via
+    /// <see cref="ChecksumCompareResult.Malformed"/> instead of being
+    /// followed. Without this, a manifest crafted (or corrupted) to point
+    /// outside the target folder would turn <c>compare-checksum</c> into a
+    /// file-disclosure oracle over the rest of the filesystem -- see
+    /// <c>docs/backlog-completed/024-checksum-compare-path-traversal.md</c>.
+    /// </remarks>
     /// <param name="directory">The folder to verify.</param>
     /// <returns>The categorized comparison result.</returns>
     /// <exception cref="FileNotFoundException"><paramref name="directory"/> has no <c>checksum_sha256.txt</c>.</exception>
@@ -62,21 +72,31 @@ public static class ChecksumFile
         }
 
         var listed = ParseManifest(manifestPath);
+        var resolvedDirectory = Path.GetFullPath(directory);
+        var allowedPrefix = resolvedDirectory + Path.DirectorySeparatorChar;
 
         var matched = new List<string>();
         var mismatched = new List<ChecksumMismatch>();
         var missing = new List<string>();
+        var malformed = new List<string>();
 
         foreach (var (relativePath, expected) in listed)
         {
             var absolutePath = Path.Combine(directory, relativePath.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(absolutePath))
+            var resolvedPath = Path.GetFullPath(absolutePath);
+            if (!resolvedPath.StartsWith(allowedPrefix, StringComparison.Ordinal))
+            {
+                malformed.Add(relativePath);
+                continue;
+            }
+
+            if (!File.Exists(resolvedPath))
             {
                 missing.Add(relativePath);
                 continue;
             }
 
-            var actual = ComputeSha256(absolutePath);
+            var actual = ComputeSha256(resolvedPath);
             if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
             {
                 matched.Add(relativePath);
@@ -95,7 +115,7 @@ public static class ChecksumFile
             .OrderBy(relativePath => relativePath, StringComparer.Ordinal)
             .ToList();
 
-        return new ChecksumCompareResult(matched, mismatched, missing, extra);
+        return new ChecksumCompareResult(matched, mismatched, missing, extra, malformed);
     }
 
     /// <summary>

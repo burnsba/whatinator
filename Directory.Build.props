@@ -12,7 +12,7 @@
          auto-appends "+{git commit sha}" to InformationalVersion since this
          is a git repo - suppressed so the version string stays a plain
          "1.0.0". -->
-    <Version>1.0.24</Version>
+    <Version>1.0.25</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
     <!-- Required for CS1591 (missing XML doc comment) to actually fire, which is

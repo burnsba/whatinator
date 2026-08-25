@@ -58,6 +58,15 @@ internal static class CompareChecksumCommand
             }
         }
 
+        if (result.Malformed.Count > 0)
+        {
+            Console.WriteLine($"Malformed manifest entries (rejected -- escape the target folder): {result.Malformed.Count}");
+            foreach (var relativePath in result.Malformed)
+            {
+                Console.WriteLine($"  {relativePath}");
+            }
+        }
+
         if (result.Extra.Count > 0)
         {
             Console.WriteLine($"Extra (not in manifest): {result.Extra.Count}");

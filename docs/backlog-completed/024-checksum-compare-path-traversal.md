@@ -1,6 +1,6 @@
 # ChecksumFile.Compare trusts relative paths from the manifest
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

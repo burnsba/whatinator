@@ -14,17 +14,28 @@ namespace Whatinator.Core.Checksums;
 /// records the decision). <see cref="Extra"/> is reported for visibility but
 /// does not affect <see cref="IsClean"/>.
 /// </param>
+/// <param name="Malformed">
+/// Manifest entries rejected because their resolved path escapes the target
+/// directory -- an absolute path, or a relative path containing <c>..</c>
+/// traversal. These are neither read nor hashed; see
+/// <see cref="Whatinator.Core.Checksums.ChecksumFile.Compare"/> and
+/// <c>docs/backlog-completed/024-checksum-compare-path-traversal.md</c>.
+/// </param>
 public sealed record ChecksumCompareResult(
     IReadOnlyList<string> Matched,
     IReadOnlyList<ChecksumMismatch> Mismatched,
     IReadOnlyList<string> Missing,
-    IReadOnlyList<string> Extra)
+    IReadOnlyList<string> Extra,
+    IReadOnlyList<string> Malformed)
 {
     /// <summary>
-    /// Whether every listed file matched with nothing missing. Deliberately
-    /// ignores <see cref="Extra"/> -- a packaged release folder always has
-    /// unlisted files by design, so requiring zero of them would make a
-    /// packaged folder unable to ever report clean.
+    /// Whether every listed file matched with nothing missing and no manifest
+    /// entry was rejected as malformed. Deliberately ignores <see cref="Extra"/>
+    /// -- a packaged release folder always has unlisted files by design, so
+    /// requiring zero of them would make a packaged folder unable to ever
+    /// report clean. <see cref="Malformed"/>, by contrast, always counts
+    /// against cleanliness -- a manifest containing a path-escaping entry is
+    /// untrustworthy regardless of what else matched.
     /// </summary>
-    public bool IsClean => Mismatched.Count == 0 && Missing.Count == 0;
+    public bool IsClean => Mismatched.Count == 0 && Missing.Count == 0 && Malformed.Count == 0;
 }
