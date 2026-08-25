@@ -1,6 +1,6 @@
 # EAC gap: track quality percentage is computed but never logged
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
@@ -33,13 +33,19 @@ line.**
 
 ## Acceptance Criteria
 
-- [ ] The `ComputeQuality` frame-offset bug fixed and verified first.
-- [ ] A quality line added to `WhatinatorEacLog.AppendTracks`, formatted to match
+- [x] The `ComputeQuality` frame-offset bug fixed and verified first. (Done as
+      part of `docs/backlog-completed/010-computequality-absolute-vs-relative-frames.md`.)
+- [x] A quality line added to `WhatinatorEacLog.AppendTracks`, formatted to match
       EAC's convention (percentage, aligned with the surrounding fields).
-- [ ] Rendered as "not available" rather than `100.0 %` when `Quality` is `null`
+- [x] Rendered as "not available" rather than `100.0 %` when `Quality` is `null`
       (no parseable progress lines were captured).
-- [ ] The conclusive summary block reflects quality where EAC's does.
-- [ ] New tests in `WhatinatorEacLogTests` pinning the formatted line for a known
+- [x] The conclusive summary block reflects quality where EAC's does. (Checked
+      against all three real example logs on hand -- none show a disc/range-level
+      quality figure for a normal secure-mode rip, only the per-track block does,
+      so no summary change was needed.)
+- [x] New tests in `WhatinatorEacLogTests` pinning the formatted line for a known
       quality value and for `null`.
 - [ ] Manual verification against a real rip: values vary per track and are not
-      uniformly 100%.
+      uniformly 100%. (Not re-verified here -- this was already the acceptance
+      criterion for backlog item 010, which fixed the underlying computation;
+      this item only surfaces that already-verified value in the log.)

@@ -71,6 +71,52 @@ public class WhatinatorEacLogTests
     }
 
     [Fact]
+    public void Format_UsesPercentageQualityFormat_ForKnownQuality()
+    {
+        var trackResult = new WhatinatorTrackRipResult(
+            TrackNumber: 1,
+            Degraded: false,
+            FlacFilePath: "/scratch/01 - Track One.flac",
+            WavFilePath: null,
+            Crc32: 0x828BDB5E,
+            Peak: 16384,
+            Quality: 0.999,
+            Attempts: 1,
+            AccurateRip: new AccurateRipTrackMatch { TrackNumber = 1, ComputedV1 = 1, ComputedV2 = 2 },
+            ElapsedTime: TimeSpan.FromSeconds(13.75));
+        var ripResult = new WhatinatorRipResult([trackResult], AccurateRipFound: false, SkippedDataTrackCount: 0);
+        var options = CreateOptions() with { RipResult = ripResult };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        // Matches the real EAC log's own example value (example/Bob Dylan -
+        // Desire.log's "Track quality 99.9 %").
+        Assert.Contains("     Track quality 99.9 %\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_UsesNotAvailable_ForNullQuality()
+    {
+        var trackResult = new WhatinatorTrackRipResult(
+            TrackNumber: 1,
+            Degraded: false,
+            FlacFilePath: "/scratch/01 - Track One.flac",
+            WavFilePath: null,
+            Crc32: 0x828BDB5E,
+            Peak: 16384,
+            Quality: null,
+            Attempts: 1,
+            AccurateRip: new AccurateRipTrackMatch { TrackNumber = 1, ComputedV1 = 1, ComputedV2 = 2 },
+            ElapsedTime: TimeSpan.FromSeconds(13.75));
+        var ripResult = new WhatinatorRipResult([trackResult], AccurateRipFound: false, SkippedDataTrackCount: 0);
+        var options = CreateOptions() with { RipResult = ripResult };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("     Track quality not available\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Format_AccurateRipHit_UsesConfidencePhrasing()
     {
         var match = new AccurateRipTrackMatch

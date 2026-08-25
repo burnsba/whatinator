@@ -265,6 +265,12 @@ public static class WhatinatorEacLog
             text.Append('\n');
             text.Append($"     Peak level {FormatPeak(trackResult.Peak)}\n");
             text.Append($"     Extraction speed {FormatSpeed(trackResult, tocTrack)}\n");
+
+            // Field order (Peak, Extraction speed, Track quality, Test CRC...)
+            // pinned to a real EAC log with the "Track quality" line present
+            // (example/Bob Dylan - Desire.log) -- see docs/track-quality.md
+            // for what this number means and where it comes from.
+            text.Append($"     Track quality {FormatQuality(trackResult.Quality)}\n");
             text.Append($"     Test CRC {trackResult.Crc32:X8}\n");
             text.Append($"     Copy CRC {trackResult.Crc32:X8}\n");
             text.Append($"     {FormatAccurateRipLine(o.RipResult.AccurateRipFound, trackResult.AccurateRip)}\n");
@@ -381,6 +387,24 @@ public static class WhatinatorEacLog
         }
 
         var percent = (peak.Value / 32768.0) * 100;
+        return $"{percent.ToString("0.0", CultureInfo.InvariantCulture)} %";
+    }
+
+    /// <summary>
+    /// Formats a track quality fraction (see <see cref="CdParanoiaTrackReader.ComputeQuality"/>,
+    /// and <c>docs/track-quality.md</c> for what the value means) as EAC's
+    /// percentage convention, one decimal place.
+    /// </summary>
+    /// <param name="quality">The quality fraction in <c>(0, 1]</c>, or <see langword="null"/> if no parseable progress lines were captured.</param>
+    /// <returns>The formatted percentage, or <c>"not available"</c> when <paramref name="quality"/> is <see langword="null"/>.</returns>
+    private static string FormatQuality(double? quality)
+    {
+        if (quality is null)
+        {
+            return "not available";
+        }
+
+        var percent = quality.Value * 100;
         return $"{percent.ToString("0.0", CultureInfo.InvariantCulture)} %";
     }
 
