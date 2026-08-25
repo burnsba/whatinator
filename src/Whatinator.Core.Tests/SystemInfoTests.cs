@@ -72,6 +72,21 @@ public class SystemInfoTests : IDisposable
     }
 
     [Fact]
+    public async Task RunCommand_DoesNotDeadlock_WhenUnreadStreamExceedsPipeBuffer()
+    {
+        // Regression test for docs/backlog-completed/012-coverartprocessor-subprocess-deadlock.md:
+        // stdout is wanted here, but stderr (unread) is made to exceed a
+        // pipe buffer (>64KB on Linux) before stdout is written. A
+        // sequential ReadToEnd/ReadToEnd would deadlock; the concurrent
+        // drain must not.
+        var task = Task.Run(() => SystemInfo.RunCommand("sh", ["-c", "yes | head -c 200000 >&2; echo done"]));
+        var completed = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        Assert.Same(task, completed);
+        Assert.Equal("done", await task);
+    }
+
+    [Fact]
     public void GetCdrdaoVersion_ReturnsNonEmptyOutput()
     {
         // Bare cdrdao exits 1 (no command given) but still prints its

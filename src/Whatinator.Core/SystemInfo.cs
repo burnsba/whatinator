@@ -14,11 +14,11 @@ public static class SystemInfo
 {
     /// <summary>Runs <c>uname -a</c> and returns its trimmed output.</summary>
     /// <returns>The uname output, or <c>"unknown"</c> if it couldn't be run.</returns>
-    public static string GetUname() => RunCommand("uname", "-a") ?? "unknown";
+    public static string GetUname() => RunCommand("uname", ["-a"]) ?? "unknown";
 
     /// <summary>Runs <c>lame --version</c> and returns its first line, trimmed.</summary>
     /// <returns>The lame version string, or <c>"unknown"</c> if it couldn't be run.</returns>
-    public static string GetLameVersion() => FirstLine(RunCommand("lame", "--version"));
+    public static string GetLameVersion() => FirstLine(RunCommand("lame", ["--version"]));
 
     /// <summary>
     /// Runs <c>flac --version</c> and returns its first line, trimmed --
@@ -27,7 +27,7 @@ public static class SystemInfo
     /// stdout (<c>flac 1.5.0</c>), unlike <c>cd-paranoia</c>/<c>cdrdao</c> below.
     /// </summary>
     /// <returns>The flac version string, or <c>"unknown"</c> if it couldn't be run.</returns>
-    public static string GetFlacVersion() => FirstLine(RunCommand("flac", "--version"));
+    public static string GetFlacVersion() => FirstLine(RunCommand("flac", ["--version"]));
 
     /// <summary>
     /// Runs <c>cd-paranoia --version</c> and returns its first line, trimmed
@@ -37,7 +37,7 @@ public static class SystemInfo
     /// <c>CLAUDE.md</c> § Gotchas).
     /// </summary>
     /// <returns>The cd-paranoia version string, or <c>"unknown"</c> if it couldn't be run.</returns>
-    public static string GetCdParanoiaVersion() => FirstLine(RunCommand("cd-paranoia", "--version", useStandardError: true));
+    public static string GetCdParanoiaVersion() => FirstLine(RunCommand("cd-paranoia", ["--version"], useStandardError: true));
 
     /// <summary>
     /// Runs bare <c>cdrdao</c> (no arguments) and returns the first line of
@@ -89,7 +89,21 @@ public static class SystemInfo
     /// its version banner.
     /// </param>
     /// <returns>The trimmed output, or <see langword="null"/> if the command couldn't be run or (when <paramref name="requireSuccess"/>) exited non-zero.</returns>
-    private static string? RunCommand(string fileName, string? arguments, bool useStandardError = false, bool requireSuccess = true)
+    /// <remarks>
+    /// Reads the wanted and "other" streams concurrently rather than one
+    /// after the other -- sequential <c>ReadToEnd</c> calls deadlock if the
+    /// unread stream fills its pipe buffer before the wanted one is fully
+    /// drained (the same class of bug as <see cref="Rip.SubprocessRunner"/>
+    /// exists to avoid; see root <c>CLAUDE.md</c> § Gotchas). Low probability
+    /// here since every probe's output is small today, but
+    /// <see cref="GetCdrdaoVersion"/> deliberately captures bare <c>cdrdao</c>'s
+    /// entire usage text, the largest of the five and the one most likely to
+    /// grow. <see langword="internal"/> (not <see langword="private"/>) so
+    /// tests can drive a synthetic multi-argument command without a fake
+    /// process seam, the same test-seam pattern as
+    /// <see cref="CoverArt.CoverArtProcessor.BuildStartInfo"/>.
+    /// </remarks>
+    internal static string? RunCommand(string fileName, string[]? arguments, bool useStandardError = false, bool requireSuccess = true)
     {
         try
         {
@@ -102,7 +116,10 @@ public static class SystemInfo
             };
             if (arguments is not null)
             {
-                startInfo.ArgumentList.Add(arguments);
+                foreach (var argument in arguments)
+                {
+                    startInfo.ArgumentList.Add(argument);
+                }
             }
 
             using var process = Process.Start(startInfo);
@@ -113,8 +130,9 @@ public static class SystemInfo
 
             var wanted = useStandardError ? process.StandardError : process.StandardOutput;
             var other = useStandardError ? process.StandardOutput : process.StandardError;
+            var otherTask = other.ReadToEndAsync();
             var output = wanted.ReadToEnd();
-            other.ReadToEnd();
+            otherTask.GetAwaiter().GetResult();
             process.WaitForExit();
             return requireSuccess && process.ExitCode != 0 ? null : output.Trim();
         }

@@ -1,6 +1,6 @@
 # An empty libdiscid error string yields an exception with an empty message
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

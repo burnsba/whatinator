@@ -19,7 +19,13 @@ internal static partial class CdParanoiaProgressLine
     /// <param name="line">A single line, without its trailing newline.</param>
     /// <param name="function">The event's function name (e.g. <c>read</c>, <c>wrote</c>, <c>verify</c>, <c>finished</c>), or <see cref="string.Empty"/> if unmatched.</param>
     /// <param name="wordOffset">The event's 16-bit-word offset into the track, or <c>0</c> if unmatched.</param>
-    /// <returns><see langword="true"/> if <paramref name="line"/> matched the <c>##:</c> wire format.</returns>
+    /// <returns>
+    /// <see langword="true"/> if <paramref name="line"/> matched the <c>##:</c>
+    /// wire format and its offset digits fit an <see cref="int"/>; <see langword="false"/>
+    /// otherwise, including a captured offset too large to parse (this is
+    /// untrusted text scraped from another program's stderr, which may be
+    /// garbled or truncated -- see root <c>CLAUDE.md</c> § Gotchas).
+    /// </returns>
     public static bool TryParse(string line, out string function, out int wordOffset)
     {
         var match = ProgressLinePattern().Match(line);
@@ -30,8 +36,14 @@ internal static partial class CdParanoiaProgressLine
             return false;
         }
 
+        if (!int.TryParse(match.Groups["offset"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out wordOffset))
+        {
+            function = string.Empty;
+            wordOffset = 0;
+            return false;
+        }
+
         function = match.Groups["function"].Value;
-        wordOffset = int.Parse(match.Groups["offset"].Value, CultureInfo.InvariantCulture);
         return true;
     }
 

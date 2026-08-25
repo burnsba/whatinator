@@ -81,22 +81,93 @@ public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLoo
         return await FetchEntriesAsync(toc, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Splits a raw AccurateRip response into its (possibly multiple)
+    /// fixed-format entries -- ported from prior research into this exact
+    /// binary format (see root <c>CLAUDE.md</c> § Gotchas). A response entry that claims
+    /// more bytes than remain in the buffer is dropped rather than throwing
+    /// -- this is untrusted external data. Each entry's 12-byte header
+    /// carries the response's own disc IDs; an entry whose header doesn't
+    /// match <paramref name="expectedDiscId1"/>/<paramref name="expectedDiscId2"/>/
+    /// <paramref name="expectedCddbId"/> is dropped too -- a server-side
+    /// mismatch, a stale caching proxy, or a truncated/misaligned read could
+    /// otherwise be matched against this disc's checksums as though it were
+    /// genuinely ours (see root <c>CLAUDE.md</c> § Gotchas).
+    /// </summary>
+    /// <param name="raw">The raw response body.</param>
+    /// <param name="expectedDiscId1">The disc's own computed first AccurateRip disc ID, as returned by <see cref="AccurateRipDiscId.Compute"/>.</param>
+    /// <param name="expectedDiscId2">The disc's own computed second AccurateRip disc ID, as returned by <see cref="AccurateRipDiscId.Compute"/>.</param>
+    /// <param name="expectedCddbId">The disc's own computed CDDB disc ID, as returned by <see cref="CddbDiscId.Compute"/>.</param>
+    /// <returns>Every entry whose header matches the expected disc IDs.</returns>
+    internal static List<AccurateRipDbEntry> ParseEntries(byte[] raw, string expectedDiscId1, string expectedDiscId2, string expectedCddbId)
+    {
+        var entries = new List<AccurateRipDbEntry>();
+        var offset = 0;
+        while (offset < raw.Length)
+        {
+            var trackCount = raw[offset];
+            var entryLength = 1 + 12 + (trackCount * 9);
+            if (offset + entryLength > raw.Length)
+            {
+                break;
+            }
+
+            var headerDiscId1 = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(offset + 1, 4)).ToString("x8");
+            var headerDiscId2 = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(offset + 5, 4)).ToString("x8");
+            var headerCddbId = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(offset + 9, 4)).ToString("x8");
+            if (headerDiscId1 != expectedDiscId1 || headerDiscId2 != expectedDiscId2 || headerCddbId != expectedCddbId)
+            {
+                offset += entryLength;
+                continue;
+            }
+
+            var confidences = new byte[trackCount];
+            var checksums = new uint[trackCount];
+            var pos = offset + 13;
+            for (var t = 0; t < trackCount; t++)
+            {
+                confidences[t] = raw[pos];
+                checksums[t] = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(pos + 1, 4));
+
+                // The remaining 4 bytes of this 9-byte record (pos+5..pos+8,
+                // skipped by the pos += 9 below) are the offset-finding CRC:
+                // a checksum of samples around frame 450 of the track, used
+                // by some clients to detect a drive's pressing offset from a
+                // partial read instead of a full-track read. It carries no
+                // v1/v2 identity for the primary CRC above -- see MatchTrack.
+                // Not consumed here: this client verifies whole tracks, and
+                // Drive.OffsetFinder already determines offset by comparing
+                // full-track checksums (via IAccurateRipEntryLookup /
+                // AccurateRipChecksum), not a frame-level probe.
+                pos += 9;
+            }
+
+            entries.Add(new AccurateRipDbEntry(confidences, checksums));
+            offset += entryLength;
+        }
+
+        return entries;
+    }
+
     /// <summary>Fetches and parses a disc's raw AccurateRip database entries -- the shared body of <see cref="MatchAsync"/> and <see cref="GetEntriesAsync"/>.</summary>
     /// <param name="toc">The disc's table of contents.</param>
     /// <param name="cancellationToken">A token to cancel the request.</param>
     /// <returns>Every parsed entry, or an empty list on a 404/network failure/empty response.</returns>
     private async Task<List<AccurateRipDbEntry>> FetchEntriesAsync(DiscToc toc, CancellationToken cancellationToken)
     {
+        var (discId1, discId2) = AccurateRipDiscId.Compute(toc);
+        var cddbId = CddbDiscId.Compute(toc);
+
         try
         {
-            using var response = await _httpClient.GetAsync(BuildPath(toc), cancellationToken).ConfigureAwait(false);
+            using var response = await _httpClient.GetAsync(BuildPath(discId1, discId2, cddbId, toc), cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 return [];
             }
 
             var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-            return ParseEntries(body);
+            return ParseEntries(body, discId1, discId2, cddbId);
         }
         catch (HttpRequestException)
         {
@@ -204,61 +275,13 @@ public sealed class AccurateRipClient : IAccurateRipClient, IAccurateRipEntryLoo
     /// ported from prior research into this exact URL scheme (see root
     /// <c>CLAUDE.md</c> § Gotchas).
     /// </summary>
+    /// <param name="discId1">The disc's first computed AccurateRip disc ID, as returned by <see cref="AccurateRipDiscId.Compute"/>.</param>
+    /// <param name="discId2">The disc's second computed AccurateRip disc ID, as returned by <see cref="AccurateRipDiscId.Compute"/>.</param>
+    /// <param name="cddbId">The disc's computed CDDB disc ID, as returned by <see cref="CddbDiscId.Compute"/>.</param>
     /// <param name="toc">The disc's table of contents.</param>
-    private static string BuildPath(DiscToc toc)
+    private static string BuildPath(string discId1, string discId2, string cddbId, DiscToc toc)
     {
-        var (discId1, discId2) = AccurateRipDiscId.Compute(toc);
-        var cddbId = CddbDiscId.Compute(toc);
         var audioTrackCount = toc.Tracks.Count(t => t.IsAudio);
         return $"{discId1[^1]}/{discId1[^2]}/{discId1[^3]}/dBAR-{audioTrackCount:D3}-{discId1}-{discId2}-{cddbId}.bin";
-    }
-
-    /// <summary>
-    /// Splits a raw AccurateRip response into its (possibly multiple)
-    /// fixed-format entries -- ported from prior research into this exact
-    /// binary format (see root <c>CLAUDE.md</c> § Gotchas). A response entry that claims
-    /// more bytes than remain in the buffer is dropped rather than throwing
-    /// -- this is untrusted external data.
-    /// </summary>
-    /// <param name="raw">The raw response body.</param>
-    private static List<AccurateRipDbEntry> ParseEntries(byte[] raw)
-    {
-        var entries = new List<AccurateRipDbEntry>();
-        var offset = 0;
-        while (offset < raw.Length)
-        {
-            var trackCount = raw[offset];
-            var entryLength = 1 + 12 + (trackCount * 9);
-            if (offset + entryLength > raw.Length)
-            {
-                break;
-            }
-
-            var confidences = new byte[trackCount];
-            var checksums = new uint[trackCount];
-            var pos = offset + 13;
-            for (var t = 0; t < trackCount; t++)
-            {
-                confidences[t] = raw[pos];
-                checksums[t] = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(pos + 1, 4));
-
-                // The remaining 4 bytes of this 9-byte record (pos+5..pos+8,
-                // skipped by the pos += 9 below) are the offset-finding CRC:
-                // a checksum of samples around frame 450 of the track, used
-                // by some clients to detect a drive's pressing offset from a
-                // partial read instead of a full-track read. It carries no
-                // v1/v2 identity for the primary CRC above -- see MatchTrack.
-                // Not consumed here: this client verifies whole tracks, and
-                // Drive.OffsetFinder already determines offset by comparing
-                // full-track checksums (via IAccurateRipEntryLookup /
-                // AccurateRipChecksum), not a frame-level probe.
-                pos += 9;
-            }
-
-            entries.Add(new AccurateRipDbEntry(confidences, checksums));
-            offset += entryLength;
-        }
-
-        return entries;
     }
 }

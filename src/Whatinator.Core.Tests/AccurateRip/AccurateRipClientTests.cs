@@ -13,6 +13,15 @@ public class AccurateRipClientTests
         new DiscTocTrack(2, 1000, 1999, IsAudio: true),
     ]);
 
+    /// <summary>
+    /// <see cref="TwoTrackToc"/>'s own computed disc IDs, as they'd appear in
+    /// a genuine response entry's 12-byte header -- used by <see cref="BuildEntry"/>
+    /// call sites so entries pass the header-validation check added for
+    /// docs/backlog/025 rather than being (correctly) rejected as a
+    /// wrong-disc response.
+    /// </summary>
+    private static readonly (uint DiscId1, uint DiscId2, uint CddbId) TwoTrackHeaderIds = ComputeHeaderIds(TwoTrackToc);
+
     [Fact]
     public async Task MatchAsync_ReturnsNotFound_On404()
     {
@@ -65,9 +74,9 @@ public class AccurateRipClientTests
         // (0x22222222) does not match anything in this entry.
         var entry = BuildEntry(
             trackCount: 2,
-            discId1: 0,
-            discId2: 0,
-            cddbId: 0,
+            discId1: TwoTrackHeaderIds.DiscId1,
+            discId2: TwoTrackHeaderIds.DiscId2,
+            cddbId: TwoTrackHeaderIds.CddbId,
             (Confidence: 5, Crc: 0x11111111),
             (Confidence: 3, Crc: 0xaaaaaaaa));
         var client = CreateClient(BinaryResponseHandler(entry));
@@ -91,8 +100,8 @@ public class AccurateRipClientTests
     [Fact]
     public async Task MatchAsync_MultipleEntries_KeepsHighestConfidenceMatch()
     {
-        var lowConfidenceEntry = BuildEntry(2, 0, 0, 0, (2, 0x11111111), (1, 0x22222222));
-        var highConfidenceEntry = BuildEntry(2, 0, 0, 0, (9, 0x11111111), (1, 0x33333333));
+        var lowConfidenceEntry = BuildEntry(2, TwoTrackHeaderIds.DiscId1, TwoTrackHeaderIds.DiscId2, TwoTrackHeaderIds.CddbId, (2, 0x11111111), (1, 0x22222222));
+        var highConfidenceEntry = BuildEntry(2, TwoTrackHeaderIds.DiscId1, TwoTrackHeaderIds.DiscId2, TwoTrackHeaderIds.CddbId, (9, 0x11111111), (1, 0x33333333));
         var response = Concat(lowConfidenceEntry, highConfidenceEntry);
         var client = CreateClient(BinaryResponseHandler(response));
 
@@ -214,10 +223,52 @@ public class AccurateRipClientTests
     }
 
     [Fact]
+    public async Task GetEntriesAsync_RejectsEntry_WhenHeaderDiscIdDoesNotMatch()
+    {
+        // A response whose header carries a different disc's IDs than the
+        // TOC being looked up -- a server-side mismatch, a stale caching
+        // proxy, or a truncated/misaligned read could all produce this.
+        var wrongDiscEntry = BuildEntry(
+            2,
+            TwoTrackHeaderIds.DiscId1 + 1,
+            TwoTrackHeaderIds.DiscId2,
+            TwoTrackHeaderIds.CddbId,
+            (5, 0x11111111),
+            (3, 0xaaaaaaaa));
+        var client = CreateClient(BinaryResponseHandler(wrongDiscEntry));
+
+        var entries = await client.GetEntriesAsync(TwoTrackToc);
+
+        Assert.Empty(entries);
+    }
+
+    [Fact]
+    public async Task MatchAsync_RealFixtureWithCorruptedHeaders_IsTreatedAsNotFound()
+    {
+        // A hand-modified copy of the real 11-track fixture: every entry's
+        // header disc-ID byte is flipped, simulating a wrong-disc response.
+        // All four entries should be rejected by header validation, leaving
+        // the disc "not found" rather than matched against someone else's
+        // checksums.
+        var toc = RealElevenTrackDiscToc();
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "AccurateRip", "Fixtures", "dBAR-011-00127f7c-00a2b21c-8e0b360b.bin");
+        var response = await File.ReadAllBytesAsync(fixturePath);
+        var corrupted = CorruptEveryEntryHeader(response, trackCount: 11);
+        var client = CreateClient(BinaryResponseHandler(corrupted));
+
+        var computedChecksums = new List<(uint V1, uint V2)> { (0x8cff983du, 0x98445115u) };
+        computedChecksums.AddRange(Enumerable.Repeat((0u, 0u), toc.Tracks.Count - 1));
+
+        var result = await client.MatchAsync(toc, computedChecksums);
+
+        Assert.False(result.Found);
+    }
+
+    [Fact]
     public async Task GetEntriesAsync_ParsesEveryEntryFromTheBinaryResponse()
     {
-        var first = BuildEntry(2, 0, 0, 0, (5, 0x11111111), (3, 0xaaaaaaaa));
-        var second = BuildEntry(2, 0, 0, 0, (9, 0x22222222), (1, 0xbbbbbbbb));
+        var first = BuildEntry(2, TwoTrackHeaderIds.DiscId1, TwoTrackHeaderIds.DiscId2, TwoTrackHeaderIds.CddbId, (5, 0x11111111), (3, 0xaaaaaaaa));
+        var second = BuildEntry(2, TwoTrackHeaderIds.DiscId1, TwoTrackHeaderIds.DiscId2, TwoTrackHeaderIds.CddbId, (9, 0x22222222), (1, 0xbbbbbbbb));
         var client = CreateClient(BinaryResponseHandler(Concat(first, second)));
 
         var entries = await client.GetEntriesAsync(TwoTrackToc);
@@ -300,4 +351,28 @@ public class AccurateRipClientTests
     }
 
     private static byte[] Concat(params byte[][] parts) => [.. parts.SelectMany(p => p)];
+
+    /// <summary>Computes a TOC's disc IDs as the raw <see cref="uint"/> values a genuine response header would carry.</summary>
+    /// <param name="toc">The disc's table of contents.</param>
+    private static (uint DiscId1, uint DiscId2, uint CddbId) ComputeHeaderIds(DiscToc toc)
+    {
+        var (discId1, discId2) = AccurateRipDiscId.Compute(toc);
+        var cddbId = CddbDiscId.Compute(toc);
+        return (Convert.ToUInt32(discId1, 16), Convert.ToUInt32(discId2, 16), Convert.ToUInt32(cddbId, 16));
+    }
+
+    /// <summary>Flips one header byte in every fixed-length entry of a captured response, simulating a wrong-disc response.</summary>
+    /// <param name="response">The real response bytes to corrupt a copy of.</param>
+    /// <param name="trackCount">The track count every entry in <paramref name="response"/> shares -- used to compute each entry's fixed length.</param>
+    private static byte[] CorruptEveryEntryHeader(byte[] response, byte trackCount)
+    {
+        var corrupted = (byte[])response.Clone();
+        var entryLength = 1 + 12 + (trackCount * 9);
+        for (var offset = 0; offset + entryLength <= corrupted.Length; offset += entryLength)
+        {
+            corrupted[offset + 1] ^= 0xFF;
+        }
+
+        return corrupted;
+    }
 }

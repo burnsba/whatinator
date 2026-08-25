@@ -60,5 +60,29 @@ public class DiscReaderTests
         Assert.Contains("libdiscid0", wrapped.Message);
         Assert.Same(inner, wrapped.InnerException);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NonEmptyOrFallback_ReturnsFallback_ForNullOrWhitespace(string? value)
+    {
+        // Marshal.PtrToStringUTF8 returns "" -- not null -- for a non-NULL
+        // pointer to a zero-length string, which is exactly the case
+        // libdiscid hits when it fails but leaves its error buffer empty.
+        // Exercised here via the plain string overload rather than a native
+        // pointer, since that's the whole point of factoring it out.
+        var result = DiscReader.NonEmptyOrFallback(value, "fallback");
+
+        Assert.Equal("fallback", result);
+    }
+
+    [Fact]
+    public void NonEmptyOrFallback_ReturnsValue_WhenNonEmpty()
+    {
+        var result = DiscReader.NonEmptyOrFallback("real value", "fallback");
+
+        Assert.Equal("real value", result);
+    }
 }
 #pragma warning restore CA1416

@@ -133,7 +133,7 @@ public sealed class FlacPackager
             return null;
         }
 
-        coverArt = await CoverArtProcessor.ProcessAsync(coverArt).ConfigureAwait(false);
+        coverArt = await CoverArtProcessor.ProcessAsync(coverArt, cancellationToken).ConfigureAwait(false);
 
         var path = Path.Combine(containerDir, "cover" + coverArt.FileExtension);
         await File.WriteAllBytesAsync(path, coverArt.Content).ConfigureAwait(false);

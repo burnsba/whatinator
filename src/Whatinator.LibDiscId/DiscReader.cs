@@ -58,7 +58,7 @@ public static class DiscReader
             if (success == 0)
             {
                 var message = Marshal.PtrToStringUTF8(NativeMethods.discid_get_error_msg(handle));
-                throw new DiscIdException(message ?? $"libdiscid failed to read '{device}' for an unknown reason.");
+                throw new DiscIdException(NonEmptyOrFallback(message, $"libdiscid failed to read '{device}' for an unknown reason."));
             }
 
             var firstTrack = NativeMethods.discid_get_first_track_num(handle);
@@ -73,10 +73,10 @@ public static class DiscReader
             }
 
             return new Disc(
-                Id: RequireString(NativeMethods.discid_get_id(handle), "disc ID"),
-                FreedbId: RequireString(NativeMethods.discid_get_freedb_id(handle), "FreeDB ID"),
-                SubmissionUrl: RequireString(NativeMethods.discid_get_submission_url(handle), "submission URL"),
-                TocString: RequireString(NativeMethods.discid_get_toc_string(handle), "TOC string"),
+                Id: RequireString(NativeMethods.discid_get_id(handle), "disc ID", device),
+                FreedbId: RequireString(NativeMethods.discid_get_freedb_id(handle), "FreeDB ID", device),
+                SubmissionUrl: RequireString(NativeMethods.discid_get_submission_url(handle), "submission URL", device),
+                TocString: RequireString(NativeMethods.discid_get_toc_string(handle), "TOC string", device),
                 FirstTrack: firstTrack,
                 LastTrack: lastTrack,
                 Sectors: NativeMethods.discid_get_sectors(handle),
@@ -98,8 +98,10 @@ public static class DiscReader
     {
         try
         {
-            return Marshal.PtrToStringUTF8(NativeMethods.discid_get_default_device())
-                ?? throw new DiscIdException("libdiscid did not report a default device.");
+            var device = Marshal.PtrToStringUTF8(NativeMethods.discid_get_default_device());
+            return string.IsNullOrWhiteSpace(device)
+                ? throw new DiscIdException("libdiscid did not report a default device.")
+                : device;
         }
         catch (DllNotFoundException ex)
         {
@@ -114,7 +116,7 @@ public static class DiscReader
     {
         try
         {
-            return Marshal.PtrToStringUTF8(NativeMethods.discid_get_version_string()) ?? "unknown";
+            return NonEmptyOrFallback(Marshal.PtrToStringUTF8(NativeMethods.discid_get_version_string()), "unknown");
         }
         catch (DllNotFoundException ex)
         {
@@ -134,12 +136,31 @@ public static class DiscReader
     internal static DiscIdException WrapMissingLibrary(DllNotFoundException ex) =>
         new(MissingLibraryMessage, ex);
 
-    /// <summary>Marshals a native UTF-8 string owned by libdiscid, throwing if it was unexpectedly null.</summary>
+    /// <summary>
+    /// Returns <paramref name="value"/> unless it is <see langword="null"/>
+    /// or consists only of whitespace, in which case <paramref name="fallback"/>
+    /// is returned instead. Needed because <see cref="Marshal.PtrToStringUTF8(IntPtr)"/>
+    /// returns <c>""</c> -- not <see langword="null"/> -- for a non-NULL
+    /// pointer to a zero-length string, so a plain <c>??</c> fallback misses
+    /// the case where libdiscid leaves its error buffer empty (see root
+    /// <c>CLAUDE.md</c> § Gotchas). Kept as a small, pointer-free helper so
+    /// it can be unit-tested without native code.
+    /// </summary>
+    /// <param name="value">The marshalled string to check.</param>
+    /// <param name="fallback">The value to return if <paramref name="value"/> is null or whitespace.</param>
+    /// <returns><paramref name="value"/>, or <paramref name="fallback"/> if it was null or whitespace.</returns>
+    internal static string NonEmptyOrFallback(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    /// <summary>Marshals a native UTF-8 string owned by libdiscid, throwing if it was unexpectedly null or empty.</summary>
     /// <param name="ptr">The native pointer returned by a <c>discid_get_*</c> function.</param>
     /// <param name="what">A short description of the value, used in the exception message.</param>
-    private static string RequireString(IntPtr ptr, string what)
+    /// <param name="device">The device the read was attempted against, used in the exception message.</param>
+    private static string RequireString(IntPtr ptr, string what, string device)
     {
-        return Marshal.PtrToStringUTF8(ptr)
-            ?? throw new DiscIdException($"libdiscid did not return a {what}.");
+        var value = Marshal.PtrToStringUTF8(ptr);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new DiscIdException($"libdiscid did not return a {what} for '{device}'.")
+            : value;
     }
 }

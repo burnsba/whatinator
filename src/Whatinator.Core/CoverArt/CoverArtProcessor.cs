@@ -28,8 +28,9 @@ public static class CoverArtProcessor
 
     /// <summary>Processes a downloaded cover art image, if possible.</summary>
     /// <param name="original">The raw downloaded image.</param>
+    /// <param name="cancellationToken">A token that kills the <c>magick</c> subprocess and cancels the wait if fired before it exits.</param>
     /// <returns>The processed image, or <paramref name="original"/> unchanged if processing wasn't possible.</returns>
-    public static async Task<CoverArtResult> ProcessAsync(CoverArtResult original)
+    public static async Task<CoverArtResult> ProcessAsync(CoverArtResult original, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(original);
 
@@ -48,7 +49,7 @@ public static class CoverArtProcessor
                 BuildStartInfo(inputPath, outputPath, isLossless),
                 (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
                 (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
-                CancellationToken.None).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
             if (exitCode != 0 || !File.Exists(outputPath))
             {
                 return original;

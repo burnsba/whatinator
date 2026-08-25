@@ -29,4 +29,27 @@ public class CdParanoiaProgressLineTests
         Assert.Equal(string.Empty, function);
         Assert.Equal(0, wordOffset);
     }
+
+    [Fact]
+    public void TryParse_ReturnsFalse_WhenOffsetExceedsIntMaxValue()
+    {
+        var parsed = CdParanoiaProgressLine.TryParse("##: 0 [read] @ 99999999999999999999", out var function, out var wordOffset);
+
+        Assert.False(parsed);
+        Assert.Equal(string.Empty, function);
+        Assert.Equal(0, wordOffset);
+    }
+
+    [Fact]
+    public void TryParse_ReturnsFalse_ForTruncatedLine()
+    {
+        // Simulates a line cut off mid-write, as can happen when
+        // cd-paranoia's progress output interleaves with other stderr text
+        // (see root CLAUDE.md § Gotchas) -- no offset digits present at all.
+        var parsed = CdParanoiaProgressLine.TryParse("##: 0 [read] @ ", out var function, out var wordOffset);
+
+        Assert.False(parsed);
+        Assert.Equal(string.Empty, function);
+        Assert.Equal(0, wordOffset);
+    }
 }

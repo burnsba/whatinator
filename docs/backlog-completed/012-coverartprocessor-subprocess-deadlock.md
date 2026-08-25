@@ -1,6 +1,6 @@
 # CoverArtProcessor can hang forever waiting on ImageMagick
 
-**Status:** not started
+**Status:** done
 
 ## Description
 

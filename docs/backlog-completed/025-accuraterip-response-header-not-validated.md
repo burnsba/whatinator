@@ -1,6 +1,6 @@
 # AccurateRip response headers are skipped, so a wrong-disc response would be accepted
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
