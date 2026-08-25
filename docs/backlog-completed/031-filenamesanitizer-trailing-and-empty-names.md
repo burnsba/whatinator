@@ -1,6 +1,6 @@
 # FileNameSanitizer does not trim trailing dots/spaces or handle an empty result
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
