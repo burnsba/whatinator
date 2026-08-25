@@ -41,19 +41,22 @@ public static class ReleasePackageArtifacts
 
     /// <summary>
     /// Rescans <paramref name="containerDir"/> for every file matching
-    /// <paramref name="audioExtension"/> and <c>.log</c> and (re)writes
-    /// <c>checksum_sha256.txt</c>. Deliberately excludes <c>cover.*</c>,
-    /// <c>id.txt</c>, <c>releaseinfo.json</c>, and <c>.m3u</c> -- see
+    /// <paramref name="audioExtension"/>, <c>.log</c>, and <c>.cue</c> and
+    /// (re)writes <c>checksum_sha256.txt</c>. Deliberately excludes
+    /// <c>cover.*</c>, <c>id.txt</c>, <c>releaseinfo.json</c>, and
+    /// <c>.m3u</c> -- see
     /// <c>docs/backlog-completed/003-compare-checksum-never-clean-on-packaged-folder.md</c>
-    /// for why. A future <c>.cue</c> file (backlog 040) belongs in this
-    /// pattern list too, once it exists.
+    /// for why. The <c>.cue</c> pattern only ever matches anything in a FLAC
+    /// folder (<see cref="Flac.FlacPackager"/> is the only writer -- see
+    /// <see cref="Whatinator.Core.CueSheetFile"/>), so it's harmless to
+    /// include here unconditionally for the MP3 rescan too.
     /// </summary>
     /// <param name="containerDir">The release's container folder.</param>
     /// <param name="audioExtension">The packaged audio file extension, including the leading dot.</param>
     /// <returns>How many files were hashed.</returns>
     public static int WriteChecksums(string containerDir, string audioExtension)
     {
-        var files = EnumerateManifestFiles(containerDir, "*" + audioExtension, "*.log")
+        var files = EnumerateManifestFiles(containerDir, "*" + audioExtension, "*.log", "*.cue")
             .Select(path => (RelativePath: ChecksumFile.ToRelativePath(containerDir, path), AbsolutePath: path))
             .ToList();
         ChecksumFile.Write(files, Path.Combine(containerDir, "checksum_sha256.txt"));

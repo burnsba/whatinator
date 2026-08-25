@@ -77,7 +77,7 @@ internal static class HelpContent
                 new HelpOption("--keep-wav", "Keep each track's WAV alongside its FLAC instead of deleting it after encode"),
             ]),
             new HelpCommand(["flac --releaseinfo <path>", "     --source <path>", "     [options]"], [
-                new HelpParagraph("Package a rip's FLAC output into the project's standard folder layout (FLAC + WAV files if --keep-wav was used, plus id.txt/checksum_sha256.txt/.m3u/releaseinfo.json copy/cover art)"),
+                new HelpParagraph("Package a rip's FLAC output into the project's standard folder layout (FLAC + WAV files if --keep-wav was used, plus id.txt/checksum_sha256.txt/.m3u/.cue/releaseinfo.json copy/cover art)"),
                 new HelpOption("--source <path>", "The rip command's --dest"),
                 new HelpOption("--dest <path>", "Parent folder for the release's container folder (default: .)"),
                 new HelpOption("--disc <N>", "Disc number (required if the release has more than one disc)"),

@@ -20,7 +20,11 @@ namespace Whatinator.Core.Mp3;
 /// artifacts (<c>releaseinfo.json</c>, <c>id.txt</c>,
 /// <c>checksum_sha256.txt</c>, <c>.m3u</c>) by rescanning whatever
 /// <c>.mp3</c> files are currently present -- safe to call once per disc of
-/// a multi-disc release, in any order, across separate sessions.
+/// a multi-disc release, in any order, across separate sessions. Unlike
+/// <see cref="FlacPackager"/>, this class never writes a <c>.cue</c> sheet
+/// (see <see cref="Whatinator.Core.CueSheetFile"/>) -- a cue sheet exists to
+/// make a rip losslessly reconstructible to disc, and a lossy MP3 encode can
+/// never serve that regardless of what the sheet says.
 /// <c>checksum_sha256.txt</c> itself only covers <c>.mp3</c> and <c>.log</c>
 /// files, not the other container-level artifacts -- see
 /// <see cref="Whatinator.Core.ReleasePackageArtifacts.WriteChecksums"/>; it's written after the fresh

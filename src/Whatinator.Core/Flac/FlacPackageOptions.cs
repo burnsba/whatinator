@@ -1,5 +1,6 @@
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Rip;
+using Whatinator.Core.Toc;
 
 namespace Whatinator.Core.Flac;
 
@@ -19,9 +20,19 @@ namespace Whatinator.Core.Flac;
 /// <c>upc:</c> line. Named distinctly from <see cref="Whatinator.Core.Metadata.ReleaseInfo.CatalogNumber"/>,
 /// which is unrelated MusicBrainz/Discogs label data.
 /// </param>
+/// <param name="Toc">
+/// This disc's physical table of contents, used to write the <c>.cue</c>
+/// sheet's <c>CATALOG</c>/<c>ISRC</c>/pregap data (see
+/// <see cref="Whatinator.Core.CueSheetFile"/>) -- <see langword="null"/> if
+/// unavailable, in which case the cue sheet is still written but without
+/// that data. Threaded per call rather than expected on
+/// <see cref="Whatinator.Core.Metadata.ReleaseInfo"/> for the same reason as
+/// <paramref name="DiscCatalogNumber"/> above.
+/// </param>
 public sealed record FlacPackageOptions(
     ReleaseInfo ReleaseInfo,
     string SourceDirectory,
     string DestinationParentDirectory,
     int? DiscNumber = null,
-    string? DiscCatalogNumber = null);
+    string? DiscCatalogNumber = null,
+    DiscToc? Toc = null);

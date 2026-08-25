@@ -1,6 +1,6 @@
 # EAC gap: CUE sheet generation
 
-**Status:** not started
+**Status:** done
 
 ## Description
 
@@ -64,18 +64,36 @@ Effort: roughly 2-4 hours for that; more for a genuinely index-accurate sheet.
 
 ## Acceptance Criteria
 
-- [ ] A `.cue` file is written into the FLAC release folder by the packager,
+- [x] A `.cue` file is written into the FLAC release folder by the packager,
       regenerated idempotently by rescan like every other container artifact.
-- [ ] Contains: `CATALOG` (from `DiscToc.CatalogNumber`) when known, `PERFORMER`,
+      Shipped as `CueSheetFile`, called from `FlacPackager.PackageAsync`.
+      One caveat from the design phase: unlike the other container-level
+      artifacts, the cue sheet is a genuinely *per-disc* artifact (its `FILE`
+      lines name that disc's own audio files) and needs that call's own
+      `DiscToc` -- a physical fact a directory rescan alone can't recover --
+      so it's written once per `PackageAsync` call from
+      `FlacPackageOptions.Toc`, not derived from rescanning the folder the
+      way `id.txt`/`.m3u`/checksums are. See root `CLAUDE.md` § "Packaging is
+      idempotent by rescan".
+- [x] Contains: `CATALOG` (from `DiscToc.CatalogNumber`) when known, `PERFORMER`,
       `TITLE`, and per track: `FILE`, `TRACK nn AUDIO`, `TITLE`, `PERFORMER`,
       `ISRC` when known, `INDEX 01`.
-- [ ] Pregaps emitted as `INDEX 00` / `PREGAP` when a full TOC scan supplied them;
-      omitted rather than guessed when it did not.
-- [ ] Decision recorded on whether the MP3 folder also gets one (probably not --
-      a cue over lossy files is not useful for reconstruction).
-- [ ] New tests: cue output for a single-disc release, a multi-disc release, a
-      various-artists release, and a degraded rip (missing tracks) -- compared
-      against expected text.
-- [ ] Output cross-checked by eye against `example/Glorious.cue` for structural
-      conformance.
-- [ ] README and `--help` updated if a new command or flag is introduced.
+- [x] Pregaps emitted as `INDEX 00` when a full TOC scan supplied them;
+      omitted rather than guessed when it did not. Because a track's ripped
+      audio includes the *following* track's pregap (root `CLAUDE.md` §
+      Gotchas), a known pregap's `INDEX 00` is emitted at the tail of the
+      *previous* track's `FILE` block, matching `example/Glorious.cue`'s own
+      structure -- and track 1's own pregap (the only one `--fast-toc`
+      reports, but never actually captured in any ripped file) is
+      deliberately never rendered.
+- [x] Decision recorded: no cue sheet for the MP3 folder -- see the doc
+      comments on `Mp3Packager` and `CueSheetFile`.
+- [x] New tests in `CueSheetFileTests.cs`: single-disc, multi-disc,
+      various-artists, degraded rip (missing track), known/unscanned/absent
+      pregap and TOC cases. Extended `FlacPackagerTests.cs` for the
+      packager-level wiring and checksum-manifest inclusion.
+- [x] Output structure (FILE/TRACK/INDEX nesting, pregap-in-previous-file
+      placement) cross-checked by eye against `example/Glorious.cue`; the
+      `REM GENRE`/`DATE`/`COMMENT` lines in that EAC-produced reference are
+      not modeled (out of scope per the scope suggestion above).
+- [x] README and `--help` updated (`flac` command entries).

@@ -10,9 +10,15 @@ namespace Whatinator.Core.Flac;
 /// doesn't produce one yet (phase 016 adds the EAC-style rip log).
 /// </param>
 /// <param name="CoverArtPath">Where cover art was saved this run, or <see langword="null"/> if none was found/fetched (or one already existed).</param>
+/// <param name="CueFilePath">
+/// Where this disc's <c>.cue</c> sheet was written, or <see langword="null"/>
+/// if no track had a matching packaged audio file to reference (see
+/// <see cref="Whatinator.Core.Rip.TrackFileMatcher.Match"/>).
+/// </param>
 public sealed record FlacPackageResult(
     string ContainerDirectory,
     string DiscDirectory,
     int MovedFlacFileCount,
     string? LogFilePath,
-    string? CoverArtPath);
+    string? CoverArtPath,
+    string? CueFilePath = null);

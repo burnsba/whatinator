@@ -48,7 +48,7 @@ Project reference: `Whatinator.LibDiscId`.
 | `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming` (includes `ContainerFolderName`, parameterized by format tag), `TrackFileNaming`. |
 | `Rip/` | The extraction path. `CdParanoiaTrackReader`, its progress parsing trio (`CdParanoiaProgressLine`/`CdParanoiaProgressReporter`/`CdParanoiaLiveOutputFilter`), `WhatinatorRipRunner`, `PipelineRunner`, `WhatinatorEacLog`, `TrackFileMatcher`, `ProcessOutputRelay`, `ProcessCancellation`, `SubprocessRunner` (the shared start/drain/kill-on-cancel sequence every subprocess wrapper in Core uses, not just this folder's). |
 | `Toc/` | The physical model. `CdrdaoTocReader` (runs `cdrdao read-toc`), `TocFileParser` (parses the `.toc` text), `DiscToc`/`DiscTocTrack`. |
-| root | `WhatinatorConfig` + `ConfigLoader`, `IdTextFile`, `M3uPlaylist`, `ReleasePackageArtifacts` (the FLAC/MP3 packagers' shared container-artifact sequence), `StreamLineWriter`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |
+| root | `WhatinatorConfig` + `ConfigLoader`, `CueSheetFile`, `IdTextFile`, `M3uPlaylist`, `ReleasePackageArtifacts` (the FLAC/MP3 packagers' shared container-artifact sequence), `StreamLineWriter`, `SystemInfo`, `WhatinatorLogHeader`, `WhatinatorVersion`, `WhatinatorUserAgent`. |
 
 ## Key types, in dependency order
 
@@ -70,12 +70,16 @@ Titles, artists, dates, `Media[]`. No frames.
 container-level artifact sequence (`releaseinfo.json`, `id.txt`, checksum
 manifest, `.m3u`), parameterized by audio extension so the rescan logic
 exists once rather than once per format; `MetadataUpdater` reuses its
-checksum rescan too. `PipelineRunner.RunDiscAsync(PipelineDiscOptions)` ->
+checksum rescan too. `FlacPackager` alone also writes a per-disc `.cue` sheet
+via `CueSheetFile`, from that call's own `FlacPackageOptions.Toc` rather than
+the shared rescan sequence -- see root `CLAUDE.md` § "Packaging is idempotent
+by rescan". `PipelineRunner.RunDiscAsync(PipelineDiscOptions)` ->
 `PipelineDiscResult` composes TOC + rip + both packagers for one disc.
 
 **Reporting:** `WhatinatorEacLog.Format(EacLogOptions)` renders the EAC-shaped
-rip log; `IdTextFile.Format` renders `id.txt`; `M3uPlaylist` the playlist;
-`ChecksumFile` the manifest; `Mp3LogFile` the MP3-side log.
+rip log; `IdTextFile.Format` renders `id.txt`; `CueSheetFile.Format` the
+`.cue` sheet; `M3uPlaylist` the playlist; `ChecksumFile` the manifest;
+`Mp3LogFile` the MP3-side log.
 
 ## Invariants worth not breaking
 

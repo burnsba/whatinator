@@ -1,6 +1,8 @@
 using Whatinator.Core.CoverArt;
 using Whatinator.Core.Metadata;
 using Whatinator.Core.Naming;
+using Whatinator.Core.Rip;
+using Whatinator.Core.Toc;
 
 namespace Whatinator.Core.Flac;
 
@@ -13,13 +15,19 @@ namespace Whatinator.Core.Flac;
 /// <c>.log</c> file if one is present (byte for byte, untouched -- see root
 /// <c>CLAUDE.md</c> § Gotchas; none exists yet as of phase 015, since
 /// <see cref="Whatinator.Core.Rip.WhatinatorRipRunner"/> doesn't produce one
-/// until phase 016) into place, then idempotently regenerates the
-/// container-level artifacts (<c>releaseinfo.json</c>, <c>id.txt</c>,
-/// <c>checksum_sha256.txt</c>, <c>.m3u</c>, cover art) by rescanning
-/// whatever <c>.flac</c> files are currently present -- safe to call once
-/// per disc of a multi-disc release, in any order, across separate
-/// sessions. <c>checksum_sha256.txt</c> itself only covers <c>.flac</c> and
-/// <c>.log</c> files, not the other container-level artifacts -- see
+/// until phase 016) into place, writes this disc's <c>.cue</c> sheet (see
+/// <see cref="Whatinator.Core.CueSheetFile"/>) alongside them, then
+/// idempotently regenerates the container-level artifacts
+/// (<c>releaseinfo.json</c>, <c>id.txt</c>, <c>checksum_sha256.txt</c>,
+/// <c>.m3u</c>, cover art) by rescanning whatever <c>.flac</c> files are
+/// currently present -- safe to call once per disc of a multi-disc release,
+/// in any order, across separate sessions. Unlike those container-level
+/// artifacts, the <c>.cue</c> sheet is written once per disc from that
+/// call's own <see cref="FlacPackageOptions.Toc"/> rather than being
+/// derivable from a directory rescan alone (a physical disc fact, not
+/// something the filesystem records). <c>checksum_sha256.txt</c> covers
+/// <c>.flac</c>, <c>.log</c>, and <c>.cue</c> files, not the other
+/// container-level artifacts -- see
 /// <see cref="Whatinator.Core.ReleasePackageArtifacts.WriteChecksums"/>.
 /// </summary>
 public sealed class FlacPackager
@@ -67,11 +75,40 @@ public sealed class FlacPackager
 
         var logFilePath = MoveLogFile(options.SourceDirectory, discDir);
 
+        var medium = releaseInfo.Media.Single(m => m.Position == discNumber);
+        var cueFilePath = WriteCueSheet(releaseInfo, medium, options.Toc, discDir);
+
         ReleasePackageArtifacts.Write(releaseInfo, containerDir, isMultiDisc, ".flac", options.DiscCatalogNumber);
 
         var coverArtPath = await TryWriteCoverArtAsync(releaseInfo, containerDir, cancellationToken).ConfigureAwait(false);
 
-        return new FlacPackageResult(containerDir, discDir, movedFlacFiles.Count, logFilePath, coverArtPath);
+        return new FlacPackageResult(containerDir, discDir, movedFlacFiles.Count, logFilePath, coverArtPath, cueFilePath);
+    }
+
+    /// <summary>
+    /// Rescans <paramref name="discDir"/> for <c>.flac</c> files and writes
+    /// this disc's <c>.cue</c> sheet, matched against <paramref name="medium"/>'s
+    /// tracks the same way <see cref="ReleasePackageArtifacts.WritePlaylist"/>
+    /// matches its <c>.m3u</c> entries -- a degraded rip's missing tracks are
+    /// simply absent from the sheet rather than blocking it.
+    /// </summary>
+    /// <param name="releaseInfo">The release being packaged.</param>
+    /// <param name="medium">This disc's track listing.</param>
+    /// <param name="toc">This disc's physical table of contents, or <see langword="null"/> if unavailable.</param>
+    /// <param name="discDir">The directory this disc's FLAC files were moved into.</param>
+    /// <returns>Where the <c>.cue</c> sheet was written, or <see langword="null"/> if no track had a matching file.</returns>
+    private static string? WriteCueSheet(ReleaseInfo releaseInfo, MediumInfo medium, DiscToc? toc, string discDir)
+    {
+        var matches = TrackFileMatcher.Match(Directory.GetFiles(discDir, "*.flac"), medium.Tracks);
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var cueTracks = matches.Select(m => (m.Track, Path.GetFileName(m.FilePath))).ToList();
+        var cuePath = Path.Combine(discDir, ReleaseFolderNaming.ReleaseDisplayName(releaseInfo) + ".cue");
+        CueSheetFile.Write(releaseInfo, cueTracks, cuePath, toc);
+        return cuePath;
     }
 
     /// <summary>Moves every file matching <paramref name="searchPattern"/> from <paramref name="sourceDir"/> into <paramref name="destDir"/>.</summary>

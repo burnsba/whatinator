@@ -108,8 +108,9 @@ disc in drive
        |
        v
   FlacPackager -> "{SortArtist} - {Title} [flac {Year}]/"
-       moves .flac/.wav/.log in, then REGENERATES releaseinfo.json, id.txt,
-       checksum_sha256.txt, .m3u, cover art by rescanning the folder
+       moves .flac/.wav/.log in, writes this disc's .cue sheet from DiscToc,
+       then REGENERATES releaseinfo.json, id.txt, checksum_sha256.txt, .m3u,
+       cover art by rescanning the folder
        |
        v
   Mp3Packager -> "{SortArtist} - {Title} [mp3 v0 {Year}]/"
@@ -240,6 +241,12 @@ container-level artifacts (`releaseinfo.json`, `id.txt`, `checksum_sha256.txt`,
 safe to run once per disc of a multi-disc release, in any order, across separate
 sessions. Preserve that property in any change: never derive a container-level
 artifact solely from the disc currently being packaged.
+
+The one exception is `FlacPackager`'s `.cue` sheet (`CueSheetFile`): it's a
+genuine per-disc artifact, not a container-level one, and needs that call's
+own `DiscToc` (a physical fact a directory rescan can't recover) -- see
+`FlacPackageOptions.Toc`. `Mp3Packager` never writes one; see its class doc
+comment for why.
 
 Corollary: a degraded disc still contributes its present tracks to the `.m3u`
 rather than being omitted until complete.

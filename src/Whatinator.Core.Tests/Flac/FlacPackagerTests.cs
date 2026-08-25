@@ -2,6 +2,7 @@ using Whatinator.Core.Checksums;
 using Whatinator.Core.CoverArt;
 using Whatinator.Core.Flac;
 using Whatinator.Core.Metadata;
+using Whatinator.Core.Toc;
 
 namespace Whatinator.Core.Tests;
 
@@ -69,7 +70,7 @@ public class FlacPackagerTests : IDisposable
         var compareResult = ChecksumFile.Compare(result.ContainerDirectory);
 
         Assert.True(compareResult.IsClean);
-        Assert.Equal(3, compareResult.Matched.Count); // 2 flac + 1 log
+        Assert.Equal(4, compareResult.Matched.Count); // 2 flac + 1 log + 1 cue
         Assert.Empty(compareResult.Mismatched);
         Assert.Empty(compareResult.Missing);
         Assert.Contains("releaseinfo.json", compareResult.Extra);
@@ -164,7 +165,7 @@ public class FlacPackagerTests : IDisposable
         Assert.Contains(afterDisc2, l => l.Contains("cd2/", StringComparison.Ordinal));
 
         var checksumLines = File.ReadAllLines(Path.Combine(result1.ContainerDirectory, "checksum_sha256.txt"));
-        Assert.Equal(6, checksumLines.Length); // 4 flac + 2 log
+        Assert.Equal(8, checksumLines.Length); // 4 flac + 2 log + 2 cue
     }
 
     [Fact]
@@ -254,6 +255,62 @@ public class FlacPackagerTests : IDisposable
         await packager.PackageAsync(options);
 
         Assert.Equal(1, coverArtClient.CallCount);
+    }
+
+    [Fact]
+    public async Task PackageAsync_WritesCueSheet_WhenTocProvided()
+    {
+        CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");
+        CreateFakeTrack(_sourceDir, "02. Artist - Track Two.flac");
+        var releaseInfo = CreateSingleDiscRelease();
+        var toc = new DiscToc(
+            [
+                new DiscTocTrack(1, 0, 7499, IsAudio: true, Isrc: "USRC17607839"),
+                new DiscTocTrack(2, 7500, 14999, IsAudio: true),
+            ],
+            CatalogNumber: "602475160991");
+        var packager = new FlacPackager(new FakeCoverArtClient());
+
+        var result = await packager.PackageAsync(new FlacPackageOptions(releaseInfo, _sourceDir, _destDir, Toc: toc));
+
+        Assert.NotNull(result.CueFilePath);
+        Assert.True(File.Exists(result.CueFilePath));
+        var cueText = File.ReadAllText(result.CueFilePath);
+        Assert.Contains("CATALOG 602475160991", cueText, StringComparison.Ordinal);
+        Assert.Contains("ISRC USRC17607839", cueText, StringComparison.Ordinal);
+        Assert.Contains("01. Artist - Track One.flac", cueText, StringComparison.Ordinal);
+        Assert.Contains("02. Artist - Track Two.flac", cueText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PackageAsync_CueSheetIsIncludedInChecksumManifest()
+    {
+        CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");
+        var releaseInfo = CreateSingleDiscRelease(trackCount: 1);
+        var toc = new DiscToc([new DiscTocTrack(1, 0, 7499, IsAudio: true)]);
+        var packager = new FlacPackager(new FakeCoverArtClient());
+
+        var result = await packager.PackageAsync(new FlacPackageOptions(releaseInfo, _sourceDir, _destDir, Toc: toc));
+
+        var compareResult = ChecksumFile.Compare(result.ContainerDirectory);
+        Assert.True(compareResult.IsClean);
+        Assert.Equal(2, compareResult.Matched.Count); // 1 flac + 1 cue
+        Assert.DoesNotContain(compareResult.Extra, e => e.EndsWith(".cue", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PackageAsync_NoCueSheet_WhenTocNotProvided()
+    {
+        CreateFakeTrack(_sourceDir, "01. Artist - Track One.flac");
+        var releaseInfo = CreateSingleDiscRelease(trackCount: 1);
+        var packager = new FlacPackager(new FakeCoverArtClient());
+
+        var result = await packager.PackageAsync(new FlacPackageOptions(releaseInfo, _sourceDir, _destDir));
+
+        Assert.NotNull(result.CueFilePath);
+        Assert.True(File.Exists(result.CueFilePath));
+        var cueText = File.ReadAllText(result.CueFilePath);
+        Assert.DoesNotContain("CATALOG", cueText, StringComparison.Ordinal);
     }
 
     private static void CreateFakeTrack(string dir, string fileName) =>
