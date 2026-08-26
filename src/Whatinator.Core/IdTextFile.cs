@@ -37,8 +37,19 @@ public static class IdTextFile
     /// pressing, kept as its own line distinct from <c>release:</c>'s
     /// MusicBrainz/Discogs label catalog number.
     /// </param>
+    /// <param name="discIdMatched">
+    /// Whether <see cref="ReleaseInfo.MusicBrainzUrl"/> was resolved from a
+    /// MusicBrainz disc-ID match (<see langword="true"/>) or a manual
+    /// release-URL override entered at the picker (<see langword="false"/>)
+    /// -- annotated onto the MusicBrainz URL line so a later reader can tell
+    /// whether the match is a provable fact about this physical disc or a
+    /// human judgment call. <see langword="null"/> (the default) means this
+    /// wasn't tracked for the call that produced <paramref name="releaseInfo"/>
+    /// (e.g. it came from a <c>--releaseinfo</c> file) and no annotation is
+    /// printed -- same "unknown, so omit" convention as <paramref name="upc"/>.
+    /// </param>
     /// <returns>The formatted text, ready to write to a file.</returns>
-    public static string Format(ReleaseInfo releaseInfo, string? upc = null)
+    public static string Format(ReleaseInfo releaseInfo, string? upc = null, bool? discIdMatched = null)
     {
         ArgumentNullException.ThrowIfNull(releaseInfo);
 
@@ -61,7 +72,14 @@ public static class IdTextFile
             text.Append(releaseInfo.Discogs.Url).Append('\n');
         }
 
-        text.Append(releaseInfo.MusicBrainzUrl).Append('\n');
+        text.Append(releaseInfo.MusicBrainzUrl);
+        text.Append(discIdMatched switch
+        {
+            true => " (disc-id match)",
+            false => " (manual override -- not disc-id matched)",
+            null => string.Empty,
+        });
+        text.Append('\n');
         text.Append('\n');
 
         AppendTrackListing(text, releaseInfo.Media);
@@ -73,8 +91,9 @@ public static class IdTextFile
     /// <param name="releaseInfo">The release to format.</param>
     /// <param name="path">The destination file path.</param>
     /// <param name="upc">The disc's UPC/EAN catalogue number -- see <see cref="Format"/>.</param>
-    public static void Write(ReleaseInfo releaseInfo, string path, string? upc = null) =>
-        File.WriteAllText(path, Format(releaseInfo, upc));
+    /// <param name="discIdMatched">Whether the MusicBrainz match was disc-ID-based -- see <see cref="Format"/>.</param>
+    public static void Write(ReleaseInfo releaseInfo, string path, string? upc = null, bool? discIdMatched = null) =>
+        File.WriteAllText(path, Format(releaseInfo, upc, discIdMatched));
 
     /// <summary>Formats the <c>release:</c> line as <c>{label} - {catalogNumber}</c>, or <c>-</c> if both are unknown.</summary>
     /// <param name="releaseInfo">The release to read label/catalog number from.</param>

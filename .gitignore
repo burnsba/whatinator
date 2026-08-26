@@ -18,3 +18,5 @@ out/
 /*.flac
 /*.mp3
 .claude/scheduled_tasks.lock
+
+.local

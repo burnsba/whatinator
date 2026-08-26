@@ -68,6 +68,33 @@ public sealed class DiscogsClient : IDiscogsClient
         }
     }
 
+    /// <summary>Fetches a single release directly by its Discogs release ID.</summary>
+    /// <param name="releaseId">The Discogs release ID (the numeric part of its release URL).</param>
+    /// <param name="cancellationToken">A token to cancel the request.</param>
+    /// <returns>The release's metadata.</returns>
+    /// <exception cref="DiscogsException">The request failed or the response couldn't be parsed.</exception>
+    public async Task<DiscogsInfo> GetReleaseAsync(string releaseId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(releaseId);
+
+        var url = $"releases/{Uri.EscapeDataString(releaseId)}";
+
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<DiscogsReleaseResponse>(url, cancellationToken).ConfigureAwait(false)
+                ?? throw new DiscogsException($"Discogs returned an empty response for '{url}'.");
+            return ToDiscogsInfo(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new DiscogsException($"Discogs request failed for '{url}'.", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new DiscogsException($"Discogs response for '{url}' couldn't be parsed.", ex);
+        }
+    }
+
     /// <summary>Converts a wire-format search result into a <see cref="DiscogsInfo"/>.</summary>
     /// <param name="result">The wire-format search result.</param>
     /// <returns>The mapped release info.</returns>
@@ -81,6 +108,26 @@ public sealed class DiscogsClient : IDiscogsClient
         Label: result.Label.Count > 0 ? result.Label[0] : null,
         CatalogNumber: NullIfBlank(result.Catno),
         Url: result.Uri is null ? string.Empty : $"https://www.discogs.com{result.Uri}");
+
+    /// <summary>Converts a wire-format release response into a <see cref="DiscogsInfo"/>.</summary>
+    /// <param name="release">The wire-format release response.</param>
+    /// <returns>The mapped release info.</returns>
+    private static DiscogsInfo ToDiscogsInfo(DiscogsReleaseResponse release)
+    {
+        var formatParts = release.Formats.SelectMany(format => new[] { format.Name }.Concat(format.Descriptions).Where(part => !string.IsNullOrWhiteSpace(part)));
+        var firstLabel = release.Labels.Count > 0 ? release.Labels[0] : null;
+
+        return new(
+            Id: release.Id.ToString(CultureInfo.InvariantCulture),
+            Title: release.Title,
+            Country: NullIfBlank(release.Country),
+            Format: formatParts.Any() ? string.Join(", ", formatParts) : null,
+            Genre: release.Genres.Count > 0 ? string.Join(", ", release.Genres) : null,
+            Style: release.Styles.Count > 0 ? string.Join(", ", release.Styles) : null,
+            Label: NullIfBlank(firstLabel?.Name),
+            CatalogNumber: NullIfBlank(firstLabel?.Catno),
+            Url: release.Uri ?? $"https://www.discogs.com/release/{release.Id.ToString(CultureInfo.InvariantCulture)}");
+    }
 
     /// <summary>Returns <see langword="null"/> for a blank string, otherwise the string unchanged.</summary>
     /// <param name="value">The value to check.</param>

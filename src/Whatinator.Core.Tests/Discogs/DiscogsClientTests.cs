@@ -91,6 +91,69 @@ public class DiscogsClientTests
     }
 
     [Fact]
+    public async Task GetReleaseAsync_MapsFields_JoiningFormatDescriptionsAndTakingFirstLabel()
+    {
+        const string json = """
+            {
+              "id": 249276,
+              "title": "Bob Dylan - Desire",
+              "country": "US",
+              "genres": [ "Folk, World, & Country" ],
+              "styles": [ "Folk Rock" ],
+              "formats": [ { "name": "CD", "descriptions": [ "Album", "Reissue" ] } ],
+              "labels": [ { "name": "Columbia", "catno": "CK 33893" }, { "name": "Sony", "catno": "88875" } ],
+              "uri": "https://www.discogs.com/release/249276-Bob-Dylan-Desire"
+            }
+            """;
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var release = await client.GetReleaseAsync("249276");
+
+        Assert.Equal("249276", release.Id);
+        Assert.Equal("Bob Dylan - Desire", release.Title);
+        Assert.Equal("US", release.Country);
+        Assert.Equal("CD, Album, Reissue", release.Format);
+        Assert.Equal("Folk, World, & Country", release.Genre);
+        Assert.Equal("Folk Rock", release.Style);
+        Assert.Equal("Columbia", release.Label);
+        Assert.Equal("CK 33893", release.CatalogNumber);
+        Assert.Equal("https://www.discogs.com/release/249276-Bob-Dylan-Desire", release.Url);
+    }
+
+    [Fact]
+    public async Task GetReleaseAsync_MapsMissingFieldsToNull_AndBuildsUrlFromId_WhenUriMissing()
+    {
+        const string json = """{ "id": 1, "title": "Some Release" }""";
+        var client = CreateClient(HttpStatusCode.OK, json);
+
+        var release = await client.GetReleaseAsync("1");
+
+        Assert.Null(release.Country);
+        Assert.Null(release.Format);
+        Assert.Null(release.Genre);
+        Assert.Null(release.Style);
+        Assert.Null(release.Label);
+        Assert.Null(release.CatalogNumber);
+        Assert.Equal("https://www.discogs.com/release/1", release.Url);
+    }
+
+    [Fact]
+    public async Task GetReleaseAsync_ThrowsDiscogsException_OnHttpError()
+    {
+        var client = CreateClient(HttpStatusCode.NotFound, "not found");
+
+        await Assert.ThrowsAsync<DiscogsException>(() => client.GetReleaseAsync("999999999"));
+    }
+
+    [Fact]
+    public async Task GetReleaseAsync_ThrowsDiscogsException_OnMalformedJson()
+    {
+        var client = CreateClient(HttpStatusCode.OK, "{ not valid json");
+
+        await Assert.ThrowsAsync<DiscogsException>(() => client.GetReleaseAsync("249276"));
+    }
+
+    [Fact]
     public void Constructing_DoesNotDoubleUserAgent_WhenTwoClientsShareOneHttpClient()
     {
         var httpClient = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.OK, """{ "results": [] }"""))

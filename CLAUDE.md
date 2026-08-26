@@ -272,6 +272,18 @@ models" above), and adding a per-disc physical fact to it would violate the
 release only ever has one `ReleaseInfo` object, so there'd be no correct
 single value to store there for a fact that's read per physical disc.
 
+The same shape of fact: whether a release's MusicBrainz match came from a
+disc-ID lookup or a manual release-URL override entered at the picker
+(`make-releaseinfo`/`pipeline`'s ambiguous-match and no-match prompts both
+offer `m` for this). Threaded the same way, as `bool? DiscIdMatched` through
+`PipelineDiscOptions`/`FlacPackageOptions`/`ReleasePackageArtifacts.Write`,
+annotating `id.txt`'s MusicBrainz URL line (`(disc-id match)` vs.
+`(manual override -- not disc-id matched)`) rather than living on
+`ReleaseInfo`. A manual MusicBrainz override is rejected -- and the picker
+re-shown -- if the resolved release's track count doesn't match the disc's;
+a manual Discogs override has no such check, since `DiscogsInfo` never
+carries a track listing in this app.
+
 ### The rip log is moved, the MP3 log is regenerated
 
 `FlacPackager` moves the `.log` `WhatinatorRipRunner` wrote **byte for byte,

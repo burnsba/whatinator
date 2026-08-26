@@ -13,7 +13,16 @@ namespace Whatinator.Core.Toc;
 /// is suppressed here too, tracked via <see cref="SawCatalogLine"/> so
 /// <see cref="CdrdaoTocReader"/> can re-emit it with the value once the
 /// parsed <c>.toc</c> file (the only place the value exists) is available.
-/// Every other line passes through unchanged.
+/// Also suppressed: the disc-capability banner cdrdao prints once at startup
+/// ("PQ sub-channel reading ... is supported", "Raw P-W sub-channel
+/// reading...", "Cooked R-W sub-channel reading...") -- purely informational
+/// and not something whatinator's output format ever surfaced -- and the
+/// bare <c>MM:SS:FF</c> elapsed-time progress lines cdrdao prints once per
+/// second while scanning a track's pregap during a full (non-fast) TOC read.
+/// Unlike cd-paranoia's <c>##:</c> progress (see
+/// <see cref="Rip.CdParanoiaProgressReporter"/>), nothing downstream
+/// consumes or reformats these, so they're dropped outright rather than
+/// rewritten. Every other line passes through unchanged.
 /// </summary>
 internal sealed partial class CdrdaoLiveOutputFilter
 {
@@ -33,10 +42,23 @@ internal sealed partial class CdrdaoLiveOutputFilter
             return null;
         }
 
-        return AnalyzingTrackLine().IsMatch(line) ? null : line;
+        if (AnalyzingTrackLine().IsMatch(line) || SubChannelCapabilityLine().IsMatch(line) || ElapsedTimeProgressLine().IsMatch(line))
+        {
+            return null;
+        }
+
+        return line;
     }
 
     /// <summary>Matches e.g. <c>Analyzing track 01 (AUDIO): start 00:00:32, length 03:42:65...</c>.</summary>
     [GeneratedRegex(@"^Analyzing track \d+ \(AUDIO\): start .*, length .*\.\.\.$")]
     private static partial Regex AnalyzingTrackLine();
+
+    /// <summary>Matches the one-time "PQ/Raw P-W/Cooked R-W sub-channel reading ... is supported" capability banner.</summary>
+    [GeneratedRegex(@"^(PQ|Raw P-W|Cooked R-W) sub-channel reading \(audio track\) is supported\b.*\.$")]
+    private static partial Regex SubChannelCapabilityLine();
+
+    /// <summary>Matches a bare <c>MM:SS:FF</c> pregap-scan progress line, e.g. <c>00:01:00</c>.</summary>
+    [GeneratedRegex(@"^\d{2}:\d{2}:\d{2}$")]
+    private static partial Regex ElapsedTimeProgressLine();
 }

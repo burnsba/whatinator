@@ -78,7 +78,7 @@ public sealed class FlacPackager
         var medium = releaseInfo.Media.Single(m => m.Position == discNumber);
         var cueFilePath = WriteCueSheet(releaseInfo, medium, options.Toc, discDir);
 
-        ReleasePackageArtifacts.Write(releaseInfo, containerDir, isMultiDisc, ".flac", options.DiscCatalogNumber);
+        ReleasePackageArtifacts.Write(releaseInfo, containerDir, isMultiDisc, ".flac", options.DiscCatalogNumber, options.DiscIdMatched);
 
         var coverArtPath = await TryWriteCoverArtAsync(releaseInfo, containerDir, cancellationToken).ConfigureAwait(false);
 

@@ -73,6 +73,37 @@ public class IdTextFileTests
         Assert.True(discogsIndex >= 0 && discogsIndex < musicBrainzIndex);
     }
 
+    [Fact]
+    public void Format_OmitsDiscIdAnnotation_WhenDiscIdMatchedIsNull()
+    {
+        var releaseInfo = CreateReleaseInfo();
+
+        var text = IdTextFile.Format(releaseInfo, discIdMatched: null);
+
+        Assert.Contains(releaseInfo.MusicBrainzUrl + "\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("disc-id", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_AnnotatesDiscIdMatch_WhenDiscIdMatchedIsTrue()
+    {
+        var releaseInfo = CreateReleaseInfo();
+
+        var text = IdTextFile.Format(releaseInfo, discIdMatched: true);
+
+        Assert.Contains(releaseInfo.MusicBrainzUrl + " (disc-id match)\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_AnnotatesManualOverride_WhenDiscIdMatchedIsFalse()
+    {
+        var releaseInfo = CreateReleaseInfo();
+
+        var text = IdTextFile.Format(releaseInfo, discIdMatched: false);
+
+        Assert.Contains(releaseInfo.MusicBrainzUrl + " (manual override -- not disc-id matched)\n", text, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("1992-05-12", "May 12, 1992")]
     [InlineData("1992-05", "May 1992")]

@@ -50,11 +50,13 @@ internal static class PipelineCommand
 
         var dest = options.GetValue("--dest") ?? ".";
         var context = CommandContext.Resolve(options);
-        var releaseInfo = await ResolveReleaseInfoAsync(options, dest, context, httpClientFactory, cancellationToken).ConfigureAwait(false);
-        if (releaseInfo is null)
+        var resolvedRelease = await ResolveReleaseInfoAsync(options, dest, context, httpClientFactory, cancellationToken).ConfigureAwait(false);
+        if (resolvedRelease is null)
         {
             return 1;
         }
+
+        var (releaseInfo, discIdMatched) = resolvedRelease.Value;
 
         int startDisc, endDisc;
         try
@@ -126,7 +128,8 @@ internal static class PipelineCommand
                         Overread: overread,
                         KeepWav: keepWav,
                         Environment: environment,
-                        FastToc: fastToc),
+                        FastToc: fastToc,
+                        DiscIdMatched: discIdMatched),
                     standardOutput,
                     standardError,
                     cancellationToken).ConfigureAwait(false);
@@ -154,12 +157,18 @@ internal static class PipelineCommand
     /// <param name="context">The caller's already-resolved config/device, so the disc-lookup path doesn't reload the config a second time per run.</param>
     /// <param name="httpClientFactory">The shared factory to resolve MusicBrainz/Discogs <see cref="HttpClient"/>s from.</param>
     /// <param name="cancellationToken">Cancelled when the user hits Ctrl-C.</param>
-    /// <returns>The resolved release, or <see langword="null"/> if the caller should exit with an error (already printed).</returns>
-    private static async Task<ReleaseInfo?> ResolveReleaseInfoAsync(ParsedOptions options, string dest, CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
+    /// <returns>
+    /// The resolved release and whether its MusicBrainz match was disc-ID-based
+    /// (<see langword="null"/> if loaded from a <c>--releaseinfo</c> file,
+    /// where that was never tracked); <see langword="null"/> if the caller
+    /// should exit with an error (already printed).
+    /// </returns>
+    private static async Task<(ReleaseInfo ReleaseInfo, bool? DiscIdMatched)?> ResolveReleaseInfoAsync(ParsedOptions options, string dest, CommandContext context, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
         var releaseInfoPath = options.GetValue("--releaseinfo");
 
         ReleaseInfo releaseInfo;
+        bool? discIdMatched;
         if (releaseInfoPath is not null)
         {
             if (!CliArgumentParsing.TryLoadReleaseInfo(releaseInfoPath, out var loaded, out var loadError))
@@ -169,6 +178,7 @@ internal static class PipelineCommand
             }
 
             releaseInfo = loaded;
+            discIdMatched = null;
         }
         else
         {
@@ -178,7 +188,8 @@ internal static class PipelineCommand
                 return null;
             }
 
-            releaseInfo = resolved;
+            releaseInfo = resolved.ReleaseInfo;
+            discIdMatched = resolved.DiscIdMatched;
         }
 
         try
@@ -192,7 +203,7 @@ internal static class PipelineCommand
             return null;
         }
 
-        return releaseInfo;
+        return (releaseInfo, discIdMatched);
     }
 
     /// <summary>Resolves the inclusive disc range this invocation covers.</summary>

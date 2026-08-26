@@ -38,6 +38,13 @@ namespace Whatinator.Core.Rip;
 /// <see langword="true"/> to restore the old fast read (track start/length
 /// only, track 1's pregap only) when that cost isn't worth paying.
 /// </param>
+/// <param name="DiscIdMatched">
+/// Whether <see cref="ReleaseInfo"/>'s MusicBrainz match came from a disc-ID
+/// lookup or a manual release-URL override, forwarded to
+/// <see cref="FlacPackageOptions.DiscIdMatched"/> for <c>id.txt</c>'s
+/// annotation. <see langword="null"/> (the default) if not tracked by the
+/// caller.
+/// </param>
 public sealed record PipelineDiscOptions(
     ReleaseInfo ReleaseInfo,
     int? DiscNumber,
@@ -49,4 +56,5 @@ public sealed record PipelineDiscOptions(
     bool Overread = false,
     bool KeepWav = false,
     RipEnvironmentInfo? Environment = null,
-    bool FastToc = false);
+    bool FastToc = false,
+    bool? DiscIdMatched = null);

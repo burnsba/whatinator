@@ -68,11 +68,12 @@ internal static class DiscInfoCommand
                     ReleaseCandidate chosen;
                     if (ask)
                     {
-                        var picked = ConsolePicker.PromptForSelection(
+                        var picked = await ConsolePicker.PromptForSelectionAsync(
                             $"Found {candidates.Count} matching releases:",
                             candidates,
                             DescribeCandidate,
-                            allowSkip: false);
+                            allowSkip: false,
+                            cancellationToken: cancellationToken).ConfigureAwait(false);
                         if (picked is null)
                         {
                             // Matches MakeReleaseInfoCommand's identical "no

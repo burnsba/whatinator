@@ -29,10 +29,20 @@ namespace Whatinator.Core.Flac;
 /// <see cref="Whatinator.Core.Metadata.ReleaseInfo"/> for the same reason as
 /// <paramref name="DiscCatalogNumber"/> above.
 /// </param>
+/// <param name="DiscIdMatched">
+/// Whether <see cref="ReleaseInfo"/>'s MusicBrainz match came from a disc-ID
+/// lookup (<see langword="true"/>) or a manual release-URL override
+/// (<see langword="false"/>), for <c>id.txt</c>'s annotation -- see
+/// <see cref="Whatinator.Core.IdTextFile.Format"/>. <see langword="null"/>
+/// (the default) if not tracked for this call, e.g. metadata loaded from a
+/// <c>--releaseinfo</c> file. Threaded per call for the same reason as
+/// <paramref name="DiscCatalogNumber"/> above.
+/// </param>
 public sealed record FlacPackageOptions(
     ReleaseInfo ReleaseInfo,
     string SourceDirectory,
     string DestinationParentDirectory,
     int? DiscNumber = null,
     string? DiscCatalogNumber = null,
-    DiscToc? Toc = null);
+    DiscToc? Toc = null,
+    bool? DiscIdMatched = null);

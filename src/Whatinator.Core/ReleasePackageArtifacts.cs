@@ -31,10 +31,15 @@ public static class ReleasePackageArtifacts
     /// <param name="isMultiDisc">Whether discs live in <c>cd1/</c>/<c>cd2/</c> subfolders or flat in <paramref name="containerDir"/>.</param>
     /// <param name="audioExtension">The packaged audio file extension, including the leading dot (<c>".flac"</c> or <c>".mp3"</c>).</param>
     /// <param name="upc">The disc's UPC/EAN catalogue number for <c>id.txt</c>, or <see langword="null"/> if unknown -- see <see cref="IdTextFile.Format"/>.</param>
-    public static void Write(ReleaseInfo releaseInfo, string containerDir, bool isMultiDisc, string audioExtension, string? upc = null)
+    /// <param name="discIdMatched">
+    /// Whether the release's MusicBrainz match was disc-ID-based, for
+    /// <c>id.txt</c>'s annotation -- see <see cref="IdTextFile.Format"/>.
+    /// <see langword="null"/> (the default) if not tracked for this call.
+    /// </param>
+    public static void Write(ReleaseInfo releaseInfo, string containerDir, bool isMultiDisc, string audioExtension, string? upc = null, bool? discIdMatched = null)
     {
         ReleaseInfoFile.Save(releaseInfo, Path.Combine(containerDir, "releaseinfo.json"));
-        IdTextFile.Write(releaseInfo, Path.Combine(containerDir, "id.txt"), upc);
+        IdTextFile.Write(releaseInfo, Path.Combine(containerDir, "id.txt"), upc, discIdMatched);
         WriteChecksums(containerDir, audioExtension);
         WritePlaylist(releaseInfo, containerDir, isMultiDisc, audioExtension);
     }

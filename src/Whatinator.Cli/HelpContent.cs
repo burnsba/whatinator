@@ -48,7 +48,7 @@ internal static class HelpContent
                 new HelpParagraph("See also: disc-info, for a human-facing MusicBrainz artist/title/track lookup"),
             ]),
             new HelpCommand(["make-releaseinfo [options]"], [
-                new HelpParagraph("Look up disc metadata on MusicBrainz (or load a supplied file), best-effort enrich with a Discogs match, and write releaseinfo.json"),
+                new HelpParagraph("Look up disc metadata on MusicBrainz (or load a supplied file), best-effort enrich with a Discogs match, and write releaseinfo.json. Ambiguous/no-match pickers offer 'm' to paste a release URL manually instead"),
                 new HelpOption("--device <path>", "Device to read (as above)"),
                 new HelpOption("--releaseinfo <path>", "Use this file's content instead of doing a fresh MusicBrainz/Discogs lookup"),
                 new HelpOption("--dest <path>", "Output folder (default: .)"),
