@@ -16,6 +16,22 @@ Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
     cts.Cancel();
+
+    // Safety net for a case the cooperative CancellationToken can't reach:
+    // Console.In.ReadLineAsync(token) (the MusicBrainz/Discogs picker's
+    // manual-URL-override prompt -- see ConsolePicker.cs and
+    // MakeReleaseInfoCommand.PromptManualMusicBrainzOverrideAsync/
+    // PromptManualDiscogsOverrideAsync) blocks on a real terminal's
+    // canonical-mode read(), which the .NET runtime cannot actually
+    // interrupt once a line has unterminated characters in it (e.g. a
+    // pasted URL before Enter is pressed) -- confirmed by direct repro:
+    // the token cancels and this handler runs, but the pending read never
+    // unblocks. Every other Ctrl-C path (mid-rip, mid-prompt-with-no-
+    // partial-line) already exits well inside this window via the normal
+    // cooperative unwind, so this only ever fires for that one stuck case.
+    _ = Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(
+        _ => Environment.Exit(130),
+        TaskScheduler.Default);
 };
 
 try

@@ -83,3 +83,14 @@ dotnet_diagnostic.SA1009.severity = none
 # triggers this on nearly every entry despite being properly formatted.
 # Same category of C#-version/StyleCop-version mismatch as SA1010.
 dotnet_diagnostic.SA1118.severity = none
+# SA1516 ("elements should be separated by blank line") misfires with no
+# file/line location at all on Whatinator.Cli/Program.cs's top-level
+# statements: the compiler wraps them plus the trailing local functions in a
+# synthesized Program class/<Main>$ method that has no real source span, and
+# StyleCop's blank-line check trips on that synthetic boundary. The file
+# itself already has blank lines between every local function -- there is
+# nothing to fix in source. Same category of C#-version/StyleCop-version
+# mismatch as SA1313/SA1000/SA1010/SA1011/SA1018/SA1009/SA1118, specific to
+# top-level statements (a known StyleCopAnalyzers gap for this pinned
+# 1.1.118 version).
+dotnet_diagnostic.SA1516.severity = none
