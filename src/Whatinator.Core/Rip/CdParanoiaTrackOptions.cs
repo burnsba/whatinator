@@ -23,7 +23,14 @@ namespace Whatinator.Core.Rip;
 /// triggers a warning (known upstream cd-paranoia bug -- see root
 /// <c>CLAUDE.md</c> § Gotchas) rather than being rejected.
 /// </param>
-/// <param name="Overread">Whether to pass <c>--force-overread</c> (read into the lead-out).</param>
+/// <param name="Overread">
+/// Whether to pass <c>--force-overread</c> (read into the lead-in/lead-out).
+/// Callers should only ever set this <see langword="true"/> for the one
+/// track that actually touches the disc's physical boundary the configured
+/// read offset shifts into -- see <see cref="OverreadPolicy.ResolveBoundaryTrackNumber"/>,
+/// which <see cref="WhatinatorRipRunner.RipAsync"/> uses to scope it. It's a
+/// no-op for every other track regardless.
+/// </param>
 /// <param name="MaxRetries">
 /// The maximum number of test+copy cycles to attempt before giving up on
 /// this track.
@@ -58,6 +65,18 @@ namespace Whatinator.Core.Rip;
 /// <see cref="Verify"/> for one track's worst-case wall-clock time -- see
 /// the CLI's <c>--stall-timeout</c>/<c>--retries</c> help text.
 /// </param>
+/// <param name="SkipOverreadOnStall">
+/// Only meaningful when <see cref="Overread"/> is <see langword="true"/>: if
+/// an overread attempt stalls (see <see cref="StallTimeoutSeconds"/>),
+/// whether <see cref="CdParanoiaTrackReader.ReadTrackAsync"/> should stop
+/// retrying with overread on (confirmed, via direct reproduction against
+/// real hardware, that it will just stall again -- see root <c>CLAUDE.md</c>
+/// § Gotchas) and retry the track's remaining attempts with overread off
+/// instead, accepting a silence-filled boundary. When <see langword="false"/>
+/// (the default), a stalled overread attempt gives up on the track
+/// immediately rather than exhausting <see cref="MaxRetries"/> retrying
+/// something already known to fail the same way every time.
+/// </param>
 public sealed record CdParanoiaTrackOptions(
     string Device,
     DiscToc Toc,
@@ -68,4 +87,5 @@ public sealed record CdParanoiaTrackOptions(
     int MaxRetries = 5,
     bool Verify = true,
     int MaxSectorReads = 12,
-    int StallTimeoutSeconds = 1200);
+    int StallTimeoutSeconds = 1200,
+    bool SkipOverreadOnStall = false);

@@ -38,6 +38,7 @@ internal static class PipelineCommand
             OptionSpec.Flag("--keep-wav"),
             OptionSpec.Flag("--fast-toc"),
             OptionSpec.Flag("--overread"),
+            OptionSpec.Flag("--skip-overread-on-stall"),
             OptionSpec.Flag("--no-verify"),
             OptionSpec.Value("--retries"),
             OptionSpec.Value("--max-sector-reads"),
@@ -99,6 +100,7 @@ internal static class PipelineCommand
         var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
         var overread = options.HasFlag("--overread") || config.GetOverread(drive?.Vendor, drive?.Model, drive?.Release);
+        var skipOverreadOnStall = options.HasFlag("--skip-overread-on-stall");
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
         var coverArtClient = new CoverArtClient(httpClientFactory.CreateClient("coverart"));
@@ -153,7 +155,8 @@ internal static class PipelineCommand
                         MaxRetries: maxRetries,
                         Verify: !noVerify,
                         MaxSectorReads: maxSectorReads,
-                        StallTimeoutSeconds: stallTimeoutSeconds),
+                        StallTimeoutSeconds: stallTimeoutSeconds,
+                        SkipOverreadOnStall: skipOverreadOnStall),
                     standardOutput,
                     standardError,
                     cancellationToken).ConfigureAwait(false);

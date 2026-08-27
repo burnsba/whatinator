@@ -37,7 +37,16 @@ namespace Whatinator.Core.Rip;
 /// cycle instead made a clean 16x read log as roughly "8.0 X" and a
 /// three-retry track log as "2.7 X", both misleadingly low.
 /// </param>
-public sealed record CdParanoiaTrackResult(bool Matched, string? WavPath, uint? Crc32, int? Peak, double? Quality, int Attempts, TimeSpan? ElapsedTime = null)
+/// <param name="DegradedReason">
+/// Why this track is <see cref="Degraded"/>, when that reason is more
+/// specific than "exhausted <see cref="CdParanoiaTrackOptions.MaxRetries"/>
+/// attempts" -- currently only set when an overread attempt stalled and
+/// <see cref="CdParanoiaTrackOptions.SkipOverreadOnStall"/> wasn't given, so
+/// the warning can name that flag instead of leaving the user to guess.
+/// <see langword="null"/> otherwise, including when <see cref="Matched"/> is
+/// <see langword="true"/>.
+/// </param>
+public sealed record CdParanoiaTrackResult(bool Matched, string? WavPath, uint? Crc32, int? Peak, double? Quality, int Attempts, TimeSpan? ElapsedTime = null, string? DegradedReason = null)
 {
     /// <summary>
     /// Whether this track could not be read after exhausting

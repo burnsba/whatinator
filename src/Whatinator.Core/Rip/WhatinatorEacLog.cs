@@ -137,7 +137,15 @@ public static class WhatinatorEacLog
     {
         text.Append('\n');
         AppendSetting(text, "Read offset correction", o.ReadOffset.ToString(CultureInfo.InvariantCulture));
-        AppendSetting(text, "Overread into Lead-In and Lead-Out", o.Overread ? "Yes" : "No");
+
+        // --overread only ever affects the single track touching the disc's
+        // physical boundary (see OverreadPolicy) -- OverreadTrackNumber
+        // records which one, or is null when --overread was given but had
+        // no effect (offset 0, or that boundary track being a data track).
+        var overreadValue = o.Overread
+            ? (o.OverreadTrackNumber is int n ? $"Yes (track {n})" : "Yes (no effect)")
+            : "No";
+        AppendSetting(text, "Overread into Lead-In and Lead-Out", overreadValue);
 
         // The next two toggles have no cd-paranoia equivalent (phase 016
         // scope decision) -- pinned to the values that match how
@@ -238,7 +246,8 @@ public static class WhatinatorEacLog
                 // "allow bad data capture just to get through capturing the
                 // cd" (WhatinatorRipResult.Degraded).
                 text.Append('\n');
-                text.Append($"     [WARNING] Track could not be read after {trackResult.Attempts} attempt(s) - no data captured\n");
+                var reasonSuffix = trackResult.DegradedReason is string reason ? $" ({reason})" : string.Empty;
+                text.Append($"     [WARNING] Track could not be read after {trackResult.Attempts} attempt(s) - no data captured{reasonSuffix}\n");
                 continue;
             }
 

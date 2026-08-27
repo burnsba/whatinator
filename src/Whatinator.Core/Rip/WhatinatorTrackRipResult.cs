@@ -31,6 +31,11 @@ namespace Whatinator.Core.Rip;
 /// EAC-style rip log's "Extraction speed" field
 /// (<see cref="Rip.WhatinatorEacLog"/>).
 /// </param>
+/// <param name="DegradedReason">
+/// Why this track is <paramref name="Degraded"/>, when more specific than
+/// "exhausted retries" -- copied from <see cref="CdParanoiaTrackResult.DegradedReason"/>.
+/// <see langword="null"/> otherwise.
+/// </param>
 public sealed record WhatinatorTrackRipResult(
     int TrackNumber,
     bool Degraded,
@@ -41,4 +46,5 @@ public sealed record WhatinatorTrackRipResult(
     double? Quality,
     int Attempts,
     AccurateRipTrackMatch? AccurateRip = null,
-    TimeSpan? ElapsedTime = null);
+    TimeSpan? ElapsedTime = null,
+    string? DegradedReason = null);

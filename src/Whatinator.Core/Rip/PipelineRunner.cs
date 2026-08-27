@@ -80,7 +80,8 @@ public sealed class PipelineRunner
             MaxRetries: options.MaxRetries,
             Verify: options.Verify,
             MaxSectorReads: options.MaxSectorReads,
-            StallTimeoutSeconds: options.StallTimeoutSeconds);
+            StallTimeoutSeconds: options.StallTimeoutSeconds,
+            SkipOverreadOnStall: options.SkipOverreadOnStall);
 
         // Local time, deliberately -- matches RipOutputTimestamp's console
         // prefix, Mp3Packager's log timestamps, and EAC's own convention.
@@ -129,7 +130,8 @@ public sealed class PipelineRunner
                 options.Environment.OsPrettyName,
                 startTime,
                 endTime,
-                options.Verify);
+                options.Verify,
+                ripResult.OverreadTrackNumber);
             var releaseDisplayName = ReleaseFolderNaming.ReleaseDisplayName(options.ReleaseInfo);
             WhatinatorEacLog.Write(logOptions, Path.Combine(rawDir, releaseDisplayName + ".log"));
         }

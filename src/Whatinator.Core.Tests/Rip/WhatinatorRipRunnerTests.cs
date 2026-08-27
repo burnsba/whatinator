@@ -129,6 +129,105 @@ public class WhatinatorRipRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RipAsync_CopiesDegradedReason_FromTrackReaderResult()
+    {
+        var toc = SingleAudioTrackToc;
+        var releaseInfo = CreateReleaseInfo([1]);
+        var reader = new FakeCdParanoiaTrackReader(degradedTracks: [1], degradedReason: "overread stalled; rerun with --skip-overread-on-stall");
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc);
+
+        Assert.Equal("overread stalled; rerun with --skip-overread-on-stall", result.Tracks[0].DegradedReason);
+    }
+
+    [Fact]
+    public async Task RipAsync_AppliesOverread_OnlyToLastTrack_WhenOffsetIsPositive()
+    {
+        var toc = new DiscToc([
+            new DiscTocTrack(1, 0, 999, IsAudio: true),
+            new DiscTocTrack(2, 1000, 1999, IsAudio: true),
+            new DiscTocTrack(3, 2000, 2999, IsAudio: true),
+        ]);
+        var releaseInfo = CreateReleaseInfo([1, 2, 3]);
+        var reader = new FakeCdParanoiaTrackReader();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc, offset: 6, overread: true);
+
+        Assert.Equal(3, result.OverreadTrackNumber);
+        Assert.False(reader.Options.Single(o => o.TrackNumber == 1).Overread);
+        Assert.False(reader.Options.Single(o => o.TrackNumber == 2).Overread);
+        Assert.True(reader.Options.Single(o => o.TrackNumber == 3).Overread);
+    }
+
+    [Fact]
+    public async Task RipAsync_AppliesOverread_OnlyToFirstTrack_WhenOffsetIsNegative()
+    {
+        var toc = new DiscToc([
+            new DiscTocTrack(1, 0, 999, IsAudio: true),
+            new DiscTocTrack(2, 1000, 1999, IsAudio: true),
+        ]);
+        var releaseInfo = CreateReleaseInfo([1, 2]);
+        var reader = new FakeCdParanoiaTrackReader();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc, offset: -6, overread: true);
+
+        Assert.Equal(1, result.OverreadTrackNumber);
+        Assert.True(reader.Options.Single(o => o.TrackNumber == 1).Overread);
+        Assert.False(reader.Options.Single(o => o.TrackNumber == 2).Overread);
+    }
+
+    [Fact]
+    public async Task RipAsync_AppliesNoOverread_WhenOffsetIsZero_EvenIfRequested()
+    {
+        var toc = new DiscToc([
+            new DiscTocTrack(1, 0, 999, IsAudio: true),
+            new DiscTocTrack(2, 1000, 1999, IsAudio: true),
+        ]);
+        var releaseInfo = CreateReleaseInfo([1, 2]);
+        var reader = new FakeCdParanoiaTrackReader();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc, offset: 0, overread: true);
+
+        Assert.Null(result.OverreadTrackNumber);
+        Assert.All(reader.Options, o => Assert.False(o.Overread));
+    }
+
+    [Fact]
+    public async Task RipAsync_AppliesNoOverread_WhenBoundaryTrackIsDataTrack()
+    {
+        var toc = new DiscToc([
+            new DiscTocTrack(1, 0, 999, IsAudio: true),
+            new DiscTocTrack(2, 1000, 1999, IsAudio: false),
+        ]);
+        var releaseInfo = CreateReleaseInfo([1]);
+        var reader = new FakeCdParanoiaTrackReader();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc, offset: 6, overread: true);
+
+        Assert.Null(result.OverreadTrackNumber);
+        Assert.False(reader.Options.Single(o => o.TrackNumber == 1).Overread);
+    }
+
+    [Fact]
+    public async Task RipAsync_AppliesNoOverread_WhenNotRequested()
+    {
+        var toc = SingleAudioTrackToc;
+        var releaseInfo = CreateReleaseInfo([1]);
+        var reader = new FakeCdParanoiaTrackReader();
+        var runner = new WhatinatorRipRunner(new FakeAccurateRipClient(), reader, new FakeFlacEncoder());
+
+        var result = await RunAsync(runner, releaseInfo, toc, offset: 6, overread: false);
+
+        Assert.Null(result.OverreadTrackNumber);
+        Assert.False(reader.Options.Single(o => o.TrackNumber == 1).Overread);
+    }
+
+    [Fact]
     public async Task RipAsync_SkipsAccurateRipLookup_WhenAnyTrackDegraded()
     {
         var toc = new DiscToc([new DiscTocTrack(1, 0, 999, IsAudio: true), new DiscTocTrack(2, 1000, 1999, IsAudio: true)]);
@@ -206,9 +305,12 @@ public class WhatinatorRipRunnerTests : IDisposable
         ReleaseInfo releaseInfo,
         DiscToc toc,
         int? discNumber = null,
-        bool keepWav = false)
+        bool keepWav = false,
+        int offset = 0,
+        bool overread = false)
     {
-        var options = new WhatinatorRipOptions("/dev/sr1", releaseInfo, toc, _tempDir, DiscNumber: discNumber, KeepWav: keepWav);
+        var options = new WhatinatorRipOptions(
+            "/dev/sr1", releaseInfo, toc, _tempDir, DiscNumber: discNumber, KeepWav: keepWav, Offset: offset, Overread: overread);
         using var stdout = new MemoryStream();
         using var stderr = new MemoryStream();
         return await runner.RipAsync(options, stdout, stderr);
@@ -250,15 +352,19 @@ public class WhatinatorRipRunnerTests : IDisposable
     private sealed class FakeCdParanoiaTrackReader : ICdParanoiaTrackReader
     {
         private readonly HashSet<int> _degradedTracks;
+        private readonly string? _degradedReason;
 
-        public FakeCdParanoiaTrackReader(IEnumerable<int>? degradedTracks = null)
+        public FakeCdParanoiaTrackReader(IEnumerable<int>? degradedTracks = null, string? degradedReason = null)
         {
             _degradedTracks = degradedTracks?.ToHashSet() ?? [];
+            _degradedReason = degradedReason;
         }
 
         public List<int> ReadTrackNumbers { get; } = [];
 
         public List<string> WavPaths { get; } = [];
+
+        public List<CdParanoiaTrackOptions> Options { get; } = [];
 
         public Task<CdParanoiaTrackResult> ReadTrackAsync(
             CdParanoiaTrackOptions options,
@@ -267,10 +373,11 @@ public class WhatinatorRipRunnerTests : IDisposable
         {
             ReadTrackNumbers.Add(options.TrackNumber);
             WavPaths.Add(options.DestinationWavPath);
+            Options.Add(options);
 
             if (_degradedTracks.Contains(options.TrackNumber))
             {
-                return Task.FromResult(new CdParanoiaTrackResult(false, null, null, null, null, 5));
+                return Task.FromResult(new CdParanoiaTrackResult(false, null, null, null, null, 5, DegradedReason: _degradedReason));
             }
 
             WriteSyntheticWav(options.DestinationWavPath);

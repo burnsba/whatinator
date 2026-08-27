@@ -26,7 +26,13 @@ namespace Whatinator.Core.Rip;
 /// <see cref="WhatinatorConfig.GetReadOffset"/> for where callers typically
 /// source this from.
 /// </param>
-/// <param name="Overread">Whether to pass <c>--force-overread</c> to every track read.</param>
+/// <param name="Overread">
+/// Whether <c>--force-overread</c> should be used at all for this rip.
+/// <see cref="WhatinatorRipRunner.RipAsync"/> scopes it to the single track
+/// that actually touches the disc boundary <see cref="Offset"/> shifts into
+/// (see <see cref="OverreadPolicy.ResolveBoundaryTrackNumber"/>) -- it's a
+/// no-op on every other track, so this option no longer means "every track."
+/// </param>
 /// <param name="KeepWav">
 /// When <see langword="true"/>, each track's accepted WAV is left in
 /// <see cref="OutputDirectory"/> alongside its <c>.flac</c> instead of being
@@ -38,6 +44,7 @@ namespace Whatinator.Core.Rip;
 /// <param name="Verify">Whether to perform the test/copy double-read and CRC32 compare on every track, forwarded to <see cref="CdParanoiaTrackOptions.Verify"/>.</param>
 /// <param name="MaxSectorReads">The per-sector retry cap passed to cd-paranoia's <c>--never-skip</c>, forwarded to <see cref="CdParanoiaTrackOptions.MaxSectorReads"/>.</param>
 /// <param name="StallTimeoutSeconds">How many seconds a stalled cd-paranoia invocation is allowed before it's killed and counted as a failed attempt, forwarded to <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>.</param>
+/// <param name="SkipOverreadOnStall">Whether a stalled overread attempt should retry with overread off instead of giving up on the track, forwarded to <see cref="CdParanoiaTrackOptions.SkipOverreadOnStall"/>.</param>
 public sealed record WhatinatorRipOptions(
     string Device,
     ReleaseInfo ReleaseInfo,
@@ -50,4 +57,5 @@ public sealed record WhatinatorRipOptions(
     int MaxRetries = 5,
     bool Verify = true,
     int MaxSectorReads = 12,
-    int StallTimeoutSeconds = 1200);
+    int StallTimeoutSeconds = 1200,
+    bool SkipOverreadOnStall = false);

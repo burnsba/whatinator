@@ -237,19 +237,28 @@ including `AccurateRipClientTests`' captured live database response.
   cd-paranoia's own robustness gap -- a well-behaved client would detect a
   bad computed position and fail instead of looping on it forever. This is
   exactly why `--overread`/`WhatinatorConfig.Overreads` are opt-in rather
-  than defaulted on -- see backlog 044 -- and why `--overread` is only worth
-  turning on when the configured read offset is large enough that skipping
-  the very edge of the disc would lose meaningful audio (see
-  `CdParanoiaTrackReader.MaxSafeOffsetSamples`, 587 samples); a small offset
-  like `+6` has essentially nothing to gain from it. `rip`/`pipeline
+  than defaulted on -- see backlog 044. Overreading only ever matters for
+  the single track touching the disc's physical edge that the read offset
+  shifts into (last track for positive, first for negative); `OverreadPolicy.ResolveBoundaryTrackNumber`
+  is what `WhatinatorRipRunner.RipAsync` uses to scope `--force-overread` to
+  just that one track instead of passing it to every track uniformly (a
+  no-op on any track that isn't at the edge, but no reason to exercise the
+  flag where it can't matter -- see backlog-completed 053). `rip`/`pipeline
   --stall-timeout` (`CdParanoiaTrackOptions.StallTimeoutSeconds`,
   `StallMonitor`) is the general mitigation for exactly this class of hang:
   it kills a single cd-paranoia invocation once it reports no forward
   progress for that long, rather than waiting on it forever -- see
-  backlog-completed 050. `--max-sector-reads`/`--never-skip` does **not**
-  help here -- that caps how many times cd-paranoia retries a sector it
-  recognizes as bad, but this spin never increments that counter at all;
-  it's a different code path.
+  backlog-completed 050. Once that boundary track's overread attempt
+  stalls, `--skip-overread-on-stall` (`CdParanoiaTrackOptions.SkipOverreadOnStall`)
+  is what decides what happens next: without it, the track is marked
+  degraded rather than burning the rest of `MaxRetries` retrying something
+  already proven to fail the same way every time; with it,
+  `CdParanoiaTrackReader.ReadTrackAsync` drops `Overread` for the track's
+  remaining attempts and finishes with the boundary silence-filled instead
+  -- see backlog-completed 053. `--max-sector-reads`/`--never-skip` does
+  **not** help with any of this -- that caps how many times cd-paranoia
+  retries a sector it recognizes as bad, but this spin never increments that
+  counter at all; it's a different code path.
 - Subprocess stdout/stderr are drained through `ProcessOutputRelay` while the
   process runs. Don't switch to a `WaitForExit()`-then-read shape -- that
   deadlocks on tools that fill the pipe buffer, which `cd-paranoia` will.

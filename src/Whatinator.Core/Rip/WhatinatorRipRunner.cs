@@ -88,6 +88,33 @@ public sealed class WhatinatorRipRunner
                 timestamped: true).ConfigureAwait(false);
         }
 
+        // Overreading only ever matters for the single track touching the
+        // disc's physical boundary the read offset shifts into -- see
+        // OverreadPolicy's own doc comment. Resolved once here (not per
+        // track) since it depends only on the disc/offset, not on any
+        // individual track's outcome.
+        int? overreadTrackNumber = null;
+        if (options.Overread)
+        {
+            var boundaryTrackNumber = OverreadPolicy.ResolveBoundaryTrackNumber(options.Toc, options.Offset);
+            var edge = options.Offset > 0 ? "last" : "first";
+            string message;
+            if (boundaryTrackNumber is int n && audioTracks.Any(t => t.TrackNumber == n))
+            {
+                overreadTrackNumber = n;
+                message = $"--overread: reading track {n} (the disc's {edge} track) with cd-paranoia's --force-overread (read offset {options.Offset} samples).";
+            }
+            else
+            {
+                var reason = boundaryTrackNumber is null
+                    ? "the read offset is 0"
+                    : $"track {boundaryTrackNumber} (the disc's {edge} track) is a data track";
+                message = $"--overread has no effect: {reason}.";
+            }
+
+            await StreamLineWriter.WriteLineAsync(standardOutput, message, cancellationToken, timestamped: true).ConfigureAwait(false);
+        }
+
         var year = ReleaseFolderNaming.ExtractYear(options.ReleaseInfo.Date);
         var yearOrNull = year == "0000" ? null : year;
 
@@ -117,17 +144,18 @@ public sealed class WhatinatorRipRunner
                     tocTrack.TrackNumber,
                     wavPath,
                     options.Offset,
-                    options.Overread,
+                    tocTrack.TrackNumber == overreadTrackNumber,
                     options.MaxRetries,
                     options.Verify,
                     options.MaxSectorReads,
-                    options.StallTimeoutSeconds),
+                    options.StallTimeoutSeconds,
+                    options.SkipOverreadOnStall),
                 standardError,
                 cancellationToken).ConfigureAwait(false);
 
             if (readResult.Degraded)
             {
-                results.Add(new WhatinatorTrackRipResult(tocTrack.TrackNumber, true, null, null, null, null, null, readResult.Attempts));
+                results.Add(new WhatinatorTrackRipResult(tocTrack.TrackNumber, true, null, null, null, null, null, readResult.Attempts, DegradedReason: readResult.DegradedReason));
                 continue;
             }
 
@@ -181,7 +209,7 @@ public sealed class WhatinatorRipRunner
             // audio track (AccurateRipClient.MatchAsync itself enforces this
             // count) -- a skipped track means it can't be attempted at all,
             // not just partially. Never fatal either way.
-            return new WhatinatorRipResult(results, false, dataTrackCount);
+            return new WhatinatorRipResult(results, false, dataTrackCount, overreadTrackNumber);
         }
 
         var arResult = await _accurateRipClient.MatchAsync(options.Toc, checksums, cancellationToken).ConfigureAwait(false);
@@ -192,6 +220,6 @@ public sealed class WhatinatorRipRunner
             merged.Add(results[i] with { AccurateRip = arResult.Tracks[i] });
         }
 
-        return new WhatinatorRipResult(merged, arResult.Found, dataTrackCount);
+        return new WhatinatorRipResult(merged, arResult.Found, dataTrackCount, overreadTrackNumber);
     }
 }

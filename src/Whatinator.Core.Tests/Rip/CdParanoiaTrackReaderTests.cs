@@ -181,7 +181,7 @@ public class CdParanoiaTrackReaderTests
     [Fact]
     public async Task RetryAsync_SucceedsImmediately_WhenFirstAttemptMatches()
     {
-        var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, _ => Task.FromResult(true), CancellationToken.None);
+        var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, _ => Task.FromResult(TrackAttemptOutcome.Matched), CancellationToken.None);
 
         Assert.True(success);
         Assert.Equal(1, attempts);
@@ -191,10 +191,10 @@ public class CdParanoiaTrackReaderTests
     public async Task RetryAsync_SucceedsAfterMismatches_WithoutExhaustingRetries()
     {
         var callCount = 0;
-        Task<bool> Attempt(CancellationToken ct)
+        Task<TrackAttemptOutcome> Attempt(CancellationToken ct)
         {
             callCount++;
-            return Task.FromResult(callCount >= 3);
+            return Task.FromResult(callCount >= 3 ? TrackAttemptOutcome.Matched : TrackAttemptOutcome.Failed);
         }
 
         var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, Attempt, CancellationToken.None);
@@ -208,10 +208,10 @@ public class CdParanoiaTrackReaderTests
     public async Task RetryAsync_ReturnsDegraded_WhenEveryAttemptMismatches()
     {
         var callCount = 0;
-        Task<bool> Attempt(CancellationToken ct)
+        Task<TrackAttemptOutcome> Attempt(CancellationToken ct)
         {
             callCount++;
-            return Task.FromResult(false);
+            return Task.FromResult(TrackAttemptOutcome.Failed);
         }
 
         var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, Attempt, CancellationToken.None);
@@ -219,6 +219,23 @@ public class CdParanoiaTrackReaderTests
         Assert.False(success);
         Assert.Equal(5, attempts);
         Assert.Equal(5, callCount);
+    }
+
+    [Fact]
+    public async Task RetryAsync_StopsEarly_WhenAttemptGivesUp()
+    {
+        var callCount = 0;
+        Task<TrackAttemptOutcome> Attempt(CancellationToken ct)
+        {
+            callCount++;
+            return Task.FromResult(callCount == 2 ? TrackAttemptOutcome.GiveUp : TrackAttemptOutcome.Failed);
+        }
+
+        var (success, attempts) = await CdParanoiaTrackReader.RetryAsync(5, Attempt, CancellationToken.None);
+
+        Assert.False(success);
+        Assert.Equal(2, attempts);
+        Assert.Equal(2, callCount);
     }
 
     [Fact]

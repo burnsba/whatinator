@@ -39,6 +39,7 @@ internal static class RipCommand
             OptionSpec.Flag("--keep-wav"),
             OptionSpec.Flag("--fast-toc"),
             OptionSpec.Flag("--overread"),
+            OptionSpec.Flag("--skip-overread-on-stall"),
             OptionSpec.Flag("--no-verify"),
             OptionSpec.Value("--retries"),
             OptionSpec.Value("--max-sector-reads"),
@@ -97,6 +98,7 @@ internal static class RipCommand
         var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
         var overread = parsedArgs.HasFlag("--overread") || config.GetOverread(drive?.Vendor, drive?.Model, drive?.Release);
+        var skipOverreadOnStall = parsedArgs.HasFlag("--skip-overread-on-stall");
         var environment = RipEnvironmentResolver.Resolve(config, drive);
 
         // Deliberately not disposed: these wrap the process's real stdout/stderr,
@@ -136,7 +138,8 @@ internal static class RipCommand
             MaxRetries: maxRetries,
             Verify: !noVerify,
             MaxSectorReads: maxSectorReads,
-            StallTimeoutSeconds: stallTimeoutSeconds);
+            StallTimeoutSeconds: stallTimeoutSeconds,
+            SkipOverreadOnStall: skipOverreadOnStall);
 
         WhatinatorRipResult result;
 
@@ -184,7 +187,8 @@ internal static class RipCommand
                 environment.OsPrettyName,
                 startTime,
                 endTime,
-                !noVerify);
+                !noVerify,
+                result.OverreadTrackNumber);
             var releaseDisplayName = ReleaseFolderNaming.ReleaseDisplayName(releaseInfo);
             WhatinatorEacLog.Write(logOptions, Path.Combine(dest, releaseDisplayName + ".log"));
         }

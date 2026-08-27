@@ -83,6 +83,12 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         Directory.CreateDirectory(destinationDir);
 
         (uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)? matched = null;
+        string? degradedReason = null;
+
+        // Starts at options.Overread and can drop to false mid-retry-cycle
+        // if an overread attempt stalls and options.SkipOverreadOnStall was
+        // given -- see the attempt delegate below.
+        var currentOverread = options.Overread;
 
         // One reporter spans every cd-paranoia invocation for this track
         // (both "test" and "copy" reads, across every retry) so its
@@ -95,37 +101,72 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             options.MaxRetries,
             async ct =>
             {
-                matched = await TryOnceAsync(options, track, destinationDir, destinationPath, renderer, ct).ConfigureAwait(false);
-                return matched is not null;
+                var attemptOptions = options with { Overread = currentOverread };
+                var (stalled, result) = await TryOnceAsync(attemptOptions, track, destinationDir, destinationPath, renderer, ct).ConfigureAwait(false);
+                if (result is not null)
+                {
+                    matched = result;
+                    return TrackAttemptOutcome.Matched;
+                }
+
+                if (stalled && currentOverread)
+                {
+                    if (options.SkipOverreadOnStall)
+                    {
+                        currentOverread = false;
+                        await WriteWarningAsync(
+                            standardOutput,
+                            "Warning: overread stalled on this track; retrying without it per --skip-overread-on-stall (boundary samples will be silence-filled).",
+                            ct).ConfigureAwait(false);
+                        return TrackAttemptOutcome.Failed;
+                    }
+
+                    degradedReason = "overread stalled; rerun with --skip-overread-on-stall to accept a silence-filled boundary instead of losing this track";
+                    return TrackAttemptOutcome.GiveUp;
+                }
+
+                return TrackAttemptOutcome.Failed;
             },
             cancellationToken).ConfigureAwait(false);
 
         return success && matched is not null
             ? new CdParanoiaTrackResult(true, destinationPath, matched.Value.Crc32, matched.Value.Peak, matched.Value.Quality, attempts, matched.Value.TestReadElapsed)
-            : new CdParanoiaTrackResult(false, null, null, null, null, attempts);
+            : new CdParanoiaTrackResult(false, null, null, null, null, attempts, DegradedReason: degradedReason);
     }
 
     /// <summary>
     /// Calls <paramref name="attempt"/> up to <paramref name="maxRetries"/>
-    /// times, stopping at the first success. A standalone, dependency-free
-    /// seam so the bounded-retry/degraded contract can be unit-tested with
-    /// a fake attempt delegate -- no real <c>cd-paranoia</c> process
-    /// involved.
+    /// times, stopping at the first <see cref="TrackAttemptOutcome.Matched"/>
+    /// or <see cref="TrackAttemptOutcome.GiveUp"/>. A standalone,
+    /// dependency-free seam so the bounded-retry/degraded/give-up-early
+    /// contract can be unit-tested with a fake attempt delegate -- no real
+    /// <c>cd-paranoia</c> process involved.
     /// </summary>
     /// <param name="maxRetries">The maximum number of attempts.</param>
-    /// <param name="attempt">Performs one attempt, returning whether it succeeded.</param>
+    /// <param name="attempt">Performs one attempt, returning its outcome.</param>
     /// <param name="cancellationToken">A token to cancel between attempts.</param>
-    /// <returns>Whether an attempt succeeded, and how many attempts it took (or <paramref name="maxRetries"/> if none did).</returns>
+    /// <returns>
+    /// Whether an attempt matched, and how many attempts it took --
+    /// <paramref name="maxRetries"/> if none matched and none gave up early,
+    /// or the attempt number <see cref="TrackAttemptOutcome.GiveUp"/> was
+    /// returned on.
+    /// </returns>
     internal static async Task<(bool Success, int Attempts)> RetryAsync(
         int maxRetries,
-        Func<CancellationToken, Task<bool>> attempt,
+        Func<CancellationToken, Task<TrackAttemptOutcome>> attempt,
         CancellationToken cancellationToken)
     {
         for (var i = 1; i <= maxRetries; i++)
         {
-            if (await attempt(cancellationToken).ConfigureAwait(false))
+            var outcome = await attempt(cancellationToken).ConfigureAwait(false);
+            if (outcome == TrackAttemptOutcome.Matched)
             {
                 return (true, i);
+            }
+
+            if (outcome == TrackAttemptOutcome.GiveUp)
+            {
+                return (false, i);
             }
         }
 
@@ -370,13 +411,15 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     /// </param>
     /// <param name="cancellationToken">A token to cancel the read.</param>
     /// <returns>
-    /// The process's exit code and its captured stderr text. A stalled
-    /// invocation (see <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>)
-    /// is reported as exit code <c>-1</c> rather than throwing, so callers
-    /// treat it exactly like any other failed attempt -- see
-    /// <see cref="TryOnceAsync"/>.
+    /// The process's exit code and its captured stderr text, plus whether
+    /// the invocation was killed for stalling (see
+    /// <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>) rather than
+    /// exiting on its own -- <c>ExitCode</c> is <c>-1</c> in that case, but
+    /// callers should branch on <c>Stalled</c> rather than the exit code
+    /// value, since it's what distinguishes a stall from an ordinary
+    /// cd-paranoia failure -- see <see cref="TryOnceAsync"/>.
     /// </returns>
-    internal static async Task<(int ExitCode, string CapturedStandardError)> RunCdParanoiaAsync(
+    internal static async Task<(int ExitCode, string CapturedStandardError, bool Stalled)> RunCdParanoiaAsync(
         CdParanoiaTrackOptions options,
         string outputPath,
         CdParanoiaProgressReporter renderer,
@@ -407,10 +450,10 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             // existing MaxRetries cycle (and eventual Degraded/warn-and-
             // continue path) handles it like any other failed read.
             renderer.RelayLine($"Warning: no read progress for {options.StallTimeoutSeconds}s -- aborting this attempt.");
-            return (-1, captured.ToString());
+            return (-1, captured.ToString(), true);
         }
 
-        return (exitCode, captured.ToString());
+        return (exitCode, captured.ToString(), false);
     }
 
     /// <summary>
@@ -422,12 +465,13 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     /// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>).
     /// </summary>
     /// <returns>
-    /// The accepted read's CRC32/peak/quality plus that read's own
-    /// wall-clock time (<c>TestReadElapsed</c> below), or
-    /// <see langword="null"/> on a size failure or (verified mode only) a
-    /// CRC32 mismatch.
+    /// Whether the attempt stalled (see <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>),
+    /// and, on success, the accepted read's CRC32/peak/quality plus that
+    /// read's own wall-clock time (<c>TestReadElapsed</c>). The result is
+    /// <see langword="null"/> when <c>Stalled</c> is <see langword="true"/>,
+    /// or on a size failure or (verified mode only) a CRC32 mismatch.
     /// </returns>
-    private static async Task<(uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)?> TryOnceAsync(
+    private static async Task<(bool Stalled, (uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)? Result)> TryOnceAsync(
         CdParanoiaTrackOptions options,
         DiscTocTrack track,
         string destinationDir,
@@ -452,9 +496,14 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             var testRun = await RunCdParanoiaAsync(options, testPath, renderer, cancellationToken).ConfigureAwait(false);
             testReadStopwatch.Stop();
             renderer.Complete();
+            if (testRun.Stalled)
+            {
+                return (true, null);
+            }
+
             if (testRun.ExitCode != 0 || !IsExpectedSize(track, testPath))
             {
-                return null;
+                return (false, null);
             }
 
             uint crc;
@@ -463,16 +512,21 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
                 renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 2, totalReads: 2);
                 var copyRun = await RunCdParanoiaAsync(options, copyPath!, renderer, cancellationToken).ConfigureAwait(false);
                 renderer.Complete();
+                if (copyRun.Stalled)
+                {
+                    return (true, null);
+                }
+
                 if (copyRun.ExitCode != 0 || !IsExpectedSize(track, copyPath!))
                 {
-                    return null;
+                    return (false, null);
                 }
 
                 var testCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(testPath));
                 var copyCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(copyPath!));
                 if (testCrc != copyCrc)
                 {
-                    return null;
+                    return (false, null);
                 }
 
                 crc = testCrc;
@@ -490,7 +544,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             var quality = ComputeQuality(testRun.CapturedStandardError, 0, stopOffset, track.StartFrame);
 
             File.Move(testPath, destinationPath, overwrite: true);
-            return (crc, peak, quality, testReadStopwatch.Elapsed);
+            return (false, (crc, peak, quality, testReadStopwatch.Elapsed));
         }
         finally
         {

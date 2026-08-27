@@ -18,7 +18,7 @@ namespace Whatinator.Core.Rip;
 /// <param name="DriveModel">The drive's model string, or <see langword="null"/> if unknown.</param>
 /// <param name="DriveRelease">The drive's firmware revision, or <see langword="null"/> if unknown.</param>
 /// <param name="ReadOffset">The sample read offset the rip used.</param>
-/// <param name="Overread">Whether the rip used <c>--force-overread</c>.</param>
+/// <param name="Overread">Whether <c>--overread</c> was given for the rip (not whether it had any effect -- see <see cref="OverreadTrackNumber"/>).</param>
 /// <param name="CacheDefeat">The drive's <see cref="CacheDefeatAnalyzer"/> result, or <see cref="CacheDefeatResult.Unknown"/> if never analyzed.</param>
 /// <param name="CdParanoiaVersion">The <c>cd-paranoia --version</c> banner, from <see cref="SystemInfo.GetCdParanoiaVersion"/>.</param>
 /// <param name="CdrdaoVersion">The <c>cdrdao</c> version banner, from <see cref="SystemInfo.GetCdrdaoVersion"/>.</param>
@@ -36,6 +36,13 @@ namespace Whatinator.Core.Rip;
 /// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>.
 /// Default <see langword="true"/> matches this project's prior always-Secure
 /// behavior.
+/// </param>
+/// <param name="OverreadTrackNumber">
+/// The track <c>--force-overread</c> actually applied to, from
+/// <see cref="WhatinatorRipResult.OverreadTrackNumber"/> -- <see langword="null"/>
+/// when <see cref="Overread"/> is <see langword="false"/>, or was
+/// <see langword="true"/> but had no effect. Governs the "Overread into
+/// Lead-In and Lead-Out" settings line.
 /// </param>
 public sealed record EacLogOptions(
     ReleaseInfo ReleaseInfo,
@@ -56,4 +63,5 @@ public sealed record EacLogOptions(
     string? OsPrettyName,
     DateTimeOffset StartTime,
     DateTimeOffset EndTime,
-    bool Verify = true);
+    bool Verify = true,
+    int? OverreadTrackNumber = null);

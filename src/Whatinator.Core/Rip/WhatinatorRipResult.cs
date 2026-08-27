@@ -13,10 +13,21 @@ namespace Whatinator.Core.Rip;
 /// AccurateRip integration.
 /// </param>
 /// <param name="SkippedDataTrackCount">How many data tracks were present on the disc and skipped (never ripped).</param>
+/// <param name="OverreadTrackNumber">
+/// The track number <c>--force-overread</c> was actually applied to, or
+/// <see langword="null"/> if <see cref="WhatinatorRipOptions.Overread"/> was
+/// <see langword="false"/>, or it was <see langword="true"/> but had no
+/// effect (a zero read offset, or the disc's boundary track being a data
+/// track never ripped) -- see <see cref="OverreadPolicy.ResolveBoundaryTrackNumber"/>.
+/// Carried on the result (rather than recomputed by the caller) so
+/// <see cref="Rip.EacLogOptions"/> can render the same decision that was
+/// printed live during the rip.
+/// </param>
 public sealed record WhatinatorRipResult(
     IReadOnlyList<WhatinatorTrackRipResult> Tracks,
     bool AccurateRipFound,
-    int SkippedDataTrackCount)
+    int SkippedDataTrackCount,
+    int? OverreadTrackNumber = null)
 {
     /// <summary>Whether every audio track was read and encoded successfully.</summary>
     public bool Success => Tracks.Count > 0 && Tracks.All(t => !t.Degraded);

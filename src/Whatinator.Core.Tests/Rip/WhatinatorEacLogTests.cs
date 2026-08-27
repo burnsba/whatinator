@@ -29,6 +29,70 @@ public class WhatinatorEacLogTests
     }
 
     [Fact]
+    public void Format_ShowsOverreadTrackNumber_WhenOverreadApplied()
+    {
+        var options = CreateOptions() with { Overread = true, OverreadTrackNumber = 9 };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("Overread into Lead-In and Lead-Out          : Yes (track 9)\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_ShowsOverreadNoEffect_WhenOverreadRequestedButTrackNumberIsNull()
+    {
+        var options = CreateOptions() with { Overread = true, OverreadTrackNumber = null };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("Overread into Lead-In and Lead-Out          : Yes (no effect)\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_ShowsDegradedReason_WhenPresent()
+    {
+        var trackResult = new WhatinatorTrackRipResult(
+            TrackNumber: 1,
+            Degraded: true,
+            FlacFilePath: null,
+            WavFilePath: null,
+            Crc32: null,
+            Peak: null,
+            Quality: null,
+            Attempts: 1,
+            DegradedReason: "overread stalled; rerun with --skip-overread-on-stall to accept a silence-filled boundary instead of losing this track");
+        var ripResult = new WhatinatorRipResult([trackResult], AccurateRipFound: false, SkippedDataTrackCount: 0);
+        var options = CreateOptions() with { RipResult = ripResult };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains(
+            "     [WARNING] Track could not be read after 1 attempt(s) - no data captured (overread stalled; rerun with --skip-overread-on-stall to accept a silence-filled boundary instead of losing this track)\n",
+            text,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_OmitsDegradedReasonParenthetical_WhenAbsent()
+    {
+        var trackResult = new WhatinatorTrackRipResult(
+            TrackNumber: 1,
+            Degraded: true,
+            FlacFilePath: null,
+            WavFilePath: null,
+            Crc32: null,
+            Peak: null,
+            Quality: null,
+            Attempts: 5);
+        var ripResult = new WhatinatorRipResult([trackResult], AccurateRipFound: false, SkippedDataTrackCount: 0);
+        var options = CreateOptions() with { RipResult = ripResult };
+
+        var text = WhatinatorEacLog.Format(options);
+
+        Assert.Contains("     [WARNING] Track could not be read after 5 attempt(s) - no data captured\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Format_IncludesHeaderDriveAndSettingsSections()
     {
         var text = WhatinatorEacLog.Format(CreateOptions());

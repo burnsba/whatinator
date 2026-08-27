@@ -24,7 +24,7 @@ namespace Whatinator.Core.Rip;
 /// </param>
 /// <param name="CreateMp3">Whether to run <see cref="Mp3Packager"/> for this disc.</param>
 /// <param name="Offset">The drive's sample read offset, forwarded to <see cref="WhatinatorRipOptions.Offset"/>.</param>
-/// <param name="Overread">Whether to pass <c>--force-overread</c> to every track read, forwarded to <see cref="WhatinatorRipOptions.Overread"/>.</param>
+/// <param name="Overread">Whether <c>--overread</c> was given, forwarded to <see cref="WhatinatorRipOptions.Overread"/> (scoped there to the disc's boundary track only -- see <see cref="OverreadPolicy"/>).</param>
 /// <param name="KeepWav">Whether to retain each track's accepted WAV, forwarded to <see cref="WhatinatorRipOptions.KeepWav"/>.</param>
 /// <param name="Environment">
 /// Drive/tool info to write an EAC-style rip log from (phase 016) -- see
@@ -49,6 +49,7 @@ namespace Whatinator.Core.Rip;
 /// <param name="Verify">Whether to perform the test/copy double-read and CRC32 compare on every track, forwarded to <see cref="WhatinatorRipOptions.Verify"/>.</param>
 /// <param name="MaxSectorReads">The per-sector retry cap passed to cd-paranoia's <c>--never-skip</c>, forwarded to <see cref="WhatinatorRipOptions.MaxSectorReads"/>.</param>
 /// <param name="StallTimeoutSeconds">How many seconds a stalled cd-paranoia invocation is allowed before it's killed and counted as a failed attempt, forwarded to <see cref="WhatinatorRipOptions.StallTimeoutSeconds"/>.</param>
+/// <param name="SkipOverreadOnStall">Whether a stalled overread attempt should retry with overread off instead of giving up on the track, forwarded to <see cref="WhatinatorRipOptions.SkipOverreadOnStall"/>.</param>
 public sealed record PipelineDiscOptions(
     ReleaseInfo ReleaseInfo,
     int? DiscNumber,
@@ -65,4 +66,5 @@ public sealed record PipelineDiscOptions(
     int MaxRetries = 5,
     bool Verify = true,
     int MaxSectorReads = 12,
-    int StallTimeoutSeconds = 1200);
+    int StallTimeoutSeconds = 1200,
+    bool SkipOverreadOnStall = false);
