@@ -335,13 +335,13 @@ internal static class MakeReleaseInfoCommand
     private static async Task<ReleaseCandidate?> PromptManualMusicBrainzOverrideAsync(CancellationToken cancellationToken)
     {
         Console.Write("MusicBrainz release URL: ");
-        var input = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+        var input = ConsoleInputSanitizer.Clean(await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false));
         if (string.IsNullOrWhiteSpace(input))
         {
             return null;
         }
 
-        if (!TryParseMusicBrainzReleaseId(input.Trim(), out var releaseId))
+        if (!TryParseMusicBrainzReleaseId(input, out var releaseId))
         {
             Console.Error.WriteLine($"'{input}' doesn't look like a MusicBrainz release URL (expected https://musicbrainz.org/release/<mbid>).");
             return null;
@@ -414,13 +414,13 @@ internal static class MakeReleaseInfoCommand
     private static async Task<DiscogsInfo?> PromptManualDiscogsOverrideAsync(IDiscogsClient discogsClient, CancellationToken cancellationToken)
     {
         Console.Write("Discogs release URL: ");
-        var input = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+        var input = ConsoleInputSanitizer.Clean(await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false));
         if (string.IsNullOrWhiteSpace(input))
         {
             return null;
         }
 
-        if (!TryParseDiscogsReleaseId(input.Trim(), out var releaseId))
+        if (!TryParseDiscogsReleaseId(input, out var releaseId))
         {
             Console.Error.WriteLine($"'{input}' doesn't look like a Discogs release URL (expected https://www.discogs.com/release/<id>-...).");
             return null;

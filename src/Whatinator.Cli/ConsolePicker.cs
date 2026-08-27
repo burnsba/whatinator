@@ -73,7 +73,7 @@ internal static class ConsolePicker
             while (true)
             {
                 Console.Write($"Select [{minChoice}-{candidates.Count}]{(manualOverride is not null ? " or 'm'" : string.Empty)}: ");
-                var input = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                var input = ConsoleInputSanitizer.Clean(await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false));
                 if (input is null)
                 {
                     // stdin closed (EOF/redirected empty input) -- stop prompting rather than
@@ -81,7 +81,7 @@ internal static class ConsolePicker
                     return null;
                 }
 
-                if (manualOverride is not null && input.Trim().Equals("m", StringComparison.OrdinalIgnoreCase))
+                if (manualOverride is not null && input.Equals("m", StringComparison.OrdinalIgnoreCase))
                 {
                     var overridden = await manualOverride(cancellationToken).ConfigureAwait(false);
                     if (overridden is not null)

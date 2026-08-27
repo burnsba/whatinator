@@ -79,7 +79,7 @@ defaults are used -- you don't need to create one.
   "cacheDefeats": { "ASUS|DRW-24F1ST   b|1.00": "CanDefeat" },
   "overreads": { "ASUS|DRW-24F1ST   b|1.00": true },
   "maxSectorReads": 12,
-  "stallTimeoutSeconds": 1200
+  "stallTimeoutSeconds": 120
 }
 ```
 
@@ -92,7 +92,7 @@ defaults are used -- you don't need to create one.
 | `cacheDefeats` | none | Per-drive audio-cache-defeat result (`"CanDefeat"`/`"CannotDefeat"`/`"Unknown"`), same key shape as `readOffsets` -- feeds the rip log's "Defeat audio cache" field. Populated automatically by `whatinator cache-check` (not run automatically before every rip, since the analysis takes real drive time); can still be edited by hand if you already know a drive's result. |
 | `overreads` | none | Per-drive `--force-overread` support (`true`/`false`), same key shape as `readOffsets` -- a drive with a `true` entry gets `--overread`'s effect (see below) on every `rip`/`pipeline` run without needing the flag each time. Not every drive supports overreading (some error, some return silence, some hang), so populate by hand only after manually verifying a drive's behavior; `rip`/`pipeline --overread` forces it on for a single run regardless of this map. |
 | `maxSectorReads` | `12` | Default for `rip`/`pipeline --max-sector-reads` (not drive-keyed, unlike the maps above) -- overridden by that flag when given. |
-| `stallTimeoutSeconds` | `1200` | Default for `rip`/`pipeline --stall-timeout` -- overridden by that flag when given. |
+| `stallTimeoutSeconds` | `120` | Default for `rip`/`pipeline --stall-timeout` -- overridden by that flag when given. |
 
 ### `--overread` and `--skip-overread-on-stall`
 
@@ -114,7 +114,7 @@ separate flag needed) and print/log which track it was, or that `--overread`
 had no effect (a zero offset, or that boundary track being a data track).
 
 If that one track's overread attempt stalls, `--stall-timeout` (default
-1200s/20 min) kills it -- but by default the track is then marked degraded
+120s/2 min) kills it -- but by default the track is then marked degraded
 (skipped, rip continues) rather than silently finishing without the
 overreads it asked for. Pass **`--skip-overread-on-stall`** alongside
 `--overread` to change that: on a stall, the track's remaining retries drop
@@ -142,58 +142,284 @@ dotnet run --project src/Whatinator.Cli -- make-checksum --dest "out/Artist - Al
 dotnet run --project src/Whatinator.Cli -- compare-checksum --dest "out/Artist - Album [flac 2001]"
 ```
 
+Commands are grouped below by what stage of the workflow they belong to. Each
+entry shows its full invocation, a short summary, and then every flag as its
+own bullet -- flags shared between `pipeline` and `rip` are documented once
+under `pipeline` and cross-referenced from `rip`.
+
 ### Setup
 
 One-time drive facts -- enumerate drives and calibrate a drive's sample read offset.
 
-| Command | Description |
-| --- | --- |
-| `list-device` | List available optical drives. |
-| `offset-find [--device <path>]` | Auto-detect the drive's sample read offset against the disc currently inserted (must already have a real entry in the AccurateRip database -- the command says so plainly and exits 1 if it doesn't, or if the disc has fewer than 3 audio tracks). Tries a ranked list of candidate offsets (most commonly correct first, sourced from AccurateRip's own public drive-offset database) until one produces a full match, then saves it to the config file's `readOffsets` map under the current drive's key, overwriting any prior entry for that same drive. Never guesses from a partial match -- if nothing matches, it says so and suggests trying a different disc. |
-| `cache-check [--device <path>]` | Run `cd-paranoia -A` against the drive -- a full read/timing pass over the whole disc, warned about up front since it takes real drive time -- and save the audio-cache-defeat classification (`CanDefeat`/`CannotDefeat`/`Unknown`) to the config file's `cacheDefeats` map under the current drive's key, overwriting any prior entry for that same drive. Feeds the rip log's "Defeat audio cache" field. |
+#### `list-device`
+
+List available optical drives.
+
+#### `offset-find [--device <path>]`
+
+Auto-detect the drive's sample read offset against the disc currently
+inserted. The disc must already have a real entry in the AccurateRip
+database -- the command says so plainly and exits 1 if it doesn't, or if the
+disc has fewer than 3 audio tracks. Tries a ranked list of candidate offsets
+(most commonly correct first, sourced from AccurateRip's own public
+drive-offset database) until one produces a full match, then saves it to the
+config file's `readOffsets` map under the current drive's key, overwriting
+any prior entry for that same drive. Never guesses from a partial match -- if
+nothing matches, it says so and suggests trying a different disc.
+
+- `--device <path>` -- the drive to calibrate. Defaults to the config file's
+  `device`, else `/dev/sr1`.
+
+#### `cache-check [--device <path>]`
+
+Run `cd-paranoia -A` against the drive -- a full read/timing pass over the
+whole disc, warned about up front since it takes real drive time -- and save
+the audio-cache-defeat classification (`CanDefeat`/`CannotDefeat`/`Unknown`)
+to the config file's `cacheDefeats` map under the current drive's key,
+overwriting any prior entry for that same drive. Feeds the rip log's "Defeat
+audio cache" field.
+
+- `--device <path>` -- the drive to analyze. Defaults to the config file's
+  `device`, else `/dev/sr1`.
 
 ### Catalog
 
 Identify a disc and produce/maintain its `releaseinfo.json`/`id.txt` metadata.
 
-| Command | Description |
-| --- | --- |
-| `disc-info [--device <path>] [--ask]` | Read a disc's TOC and MusicBrainz disc ID (default device: config, else `/dev/sr1`), then best-effort look up the disc on MusicBrainz and print its artist, release title, and per-track titles/durations for every disc of the matched release. Multiple MusicBrainz matches: without `--ask`, uses the first match automatically and lists the others; with `--ask`, prompts for a selection on stdin, same picker as `make-releaseinfo` -- if no selection is made (e.g. stdin closes before a choice is entered), exits 1, matching `make-releaseinfo`. A MusicBrainz miss or lookup failure isn't fatal -- the disc's TOC info (already printed) is still useful on its own. Diagnostic command from phase 002, extended per `docs/plan/backlog-closed/track_info.md`. See also `toc`, for the frame-accurate technical read `rip`/`pipeline` use internally. |
-| `toc [--device <path>] [--full]` | Read a disc's frame-accurate TOC via `cdrdao read-toc` and print its track table (start/length as time and frames, pregap, ISRC). Fast by default (`--fast-toc`, track start/length only, near-instant); `--full` additionally scans for per-track pregaps (much slower -- cdrdao has to scan audio content across every track boundary). Diagnostic command from phase 013 -- the detail level `disc-info`'s libdiscid-based read deliberately skips; no MusicBrainz involvement here at all. |
-| `make-releaseinfo [--device <path>] [--releaseinfo <path>] [--dest <path>]` | Look up the disc on MusicBrainz (or, with `--releaseinfo`, use that file's content instead of doing a fresh lookup), best-effort enrich with a matching Discogs release (by barcode), and write `{dest}/releaseinfo.json` (default dest `.`) either way -- the command's job is always producing that file; `--releaseinfo` only changes where its content comes from. Multiple matches (MusicBrainz or Discogs): prompts for a selection on stdin (Discogs prompt includes a skip option). Either picker also offers `m` to manually paste a MusicBrainz/Discogs release URL instead; a MusicBrainz override is rejected (prompting again) if its track count doesn't match the disc's. Zero MusicBrainz matches: prints the disc's known TOC info, then offers the same manual-URL prompt (no numbered candidates to pick from) before giving up -- exits 1, no file written, only if that's also declined (blank input/EOF). Ctrl-C aborts any of these prompts cleanly. `id.txt`'s MusicBrainz line notes whether the match was disc-ID-based or a manual override. |
-| `update-metadata --releaseinfo <path> --dest <path>` | Apply a corrected `releaseinfo.json` (`--releaseinfo`) to an already-packaged FLAC/MP3 release folder (`--dest`). Backs up the folder's existing `releaseinfo.json` to `releaseinfo.bak` (overwritten each run -- point a later `update-metadata` at it to revert), then overwrites `releaseinfo.json`, regenerates `id.txt`, and recalculates `checksum_sha256.txt` for whichever audio format (`.flac`/`.mp3`) is present, plus any `.log` file. Prompts for `y`/`n` confirmation on stdin if the artist or title differs from what's currently there. Renames the folder if its computed name (`"{Artist} - {Title} [flac/mp3 v0 {Year}]"`) no longer matches -- covers both a year correction and an artist/title correction. Doesn't touch individual audio files, tags, or the `.m3u`. |
-| `id-txt --releaseinfo <path> [--dest <path>]` | Generate `id.txt` from a saved `releaseinfo.json` (`--releaseinfo` required), written to `{dest}/id.txt` (default dest `.`). One file per release -- for a multi-disc release, put it in the folder that contains `cd1/`, `cd2/`, etc., not inside a disc subfolder. No network calls. |
+#### `disc-info [--device <path>] [--ask]`
+
+Read a disc's TOC and MusicBrainz disc ID, then best-effort look up the disc
+on MusicBrainz and print its artist, release title, and per-track
+titles/durations for every disc of the matched release. A MusicBrainz miss or
+lookup failure isn't fatal -- the disc's TOC info (already printed) is still
+useful on its own. Diagnostic command from phase 002, extended per
+`docs/plan/backlog-closed/track_info.md`. See also `toc`, for the
+frame-accurate technical read `rip`/`pipeline` use internally.
+
+- `--device <path>` -- the drive to read. Defaults to the config file's
+  `device`, else `/dev/sr1`.
+- `--ask` -- when MusicBrainz returns multiple matches, prompt for a
+  selection on stdin (same picker as `make-releaseinfo`) instead of using the
+  first match automatically. If no selection is made (e.g. stdin closes
+  before a choice is entered), exits 1, matching `make-releaseinfo`. Without
+  `--ask`, the other matches are still listed for reference.
+
+#### `toc [--device <path>] [--full]`
+
+Read a disc's frame-accurate TOC via `cdrdao read-toc` and print its track
+table (start/length as time and frames, pregap, ISRC). Diagnostic command
+from phase 013 -- the detail level `disc-info`'s libdiscid-based read
+deliberately skips; no MusicBrainz involvement here at all.
+
+- `--device <path>` -- the drive to read. Defaults to the config file's
+  `device`, else `/dev/sr1`.
+- `--full` -- additionally scan for per-track pregaps (much slower --
+  `cdrdao` has to scan audio content across every track boundary). Without
+  it, only track 1's pregap is reported (near-instant).
+
+#### `make-releaseinfo [--device <path>] [--releaseinfo <path>] [--dest <path>]`
+
+Look up the disc on MusicBrainz (or, with `--releaseinfo`, use that file's
+content instead of doing a fresh lookup), best-effort enrich with a matching
+Discogs release (by barcode), and write `{dest}/releaseinfo.json` either way
+-- the command's job is always producing that file; `--releaseinfo` only
+changes where its content comes from. Multiple matches (MusicBrainz or
+Discogs) prompt for a selection on stdin (the Discogs prompt includes a skip
+option); either picker also offers `m` to manually paste a
+MusicBrainz/Discogs release URL instead, and a manual MusicBrainz override is
+rejected (prompting again) if its track count doesn't match the disc's. Zero
+MusicBrainz matches prints the disc's known TOC info, then offers the same
+manual-URL prompt (no numbered candidates to pick from) before giving up --
+exits 1, no file written, only if that's also declined (blank input/EOF).
+Ctrl-C aborts any of these prompts cleanly. `id.txt`'s MusicBrainz line notes
+whether the match was disc-ID-based or a manual override.
+
+- `--device <path>` -- the drive to read. Defaults to the config file's
+  `device`, else `/dev/sr1`. Ignored when `--releaseinfo` is given.
+- `--releaseinfo <path>` -- use this file's content instead of a fresh
+  MusicBrainz lookup.
+- `--dest <path>` -- folder to write `releaseinfo.json` into. Default `.`.
+
+#### `update-metadata --releaseinfo <path> --dest <path>`
+
+Apply a corrected `releaseinfo.json` to an already-packaged FLAC/MP3 release
+folder. Backs up the folder's existing `releaseinfo.json` to
+`releaseinfo.bak` (overwritten each run -- point a later `update-metadata` at
+it to revert), then overwrites `releaseinfo.json`, regenerates `id.txt`, and
+recalculates `checksum_sha256.txt` for whichever audio format (`.flac`/`.mp3`)
+is present, plus any `.log` file. Renames the folder if its computed name
+(`"{Artist} - {Title} [flac/mp3 v0 {Year}]"`) no longer matches -- covers both
+a year correction and an artist/title correction. Doesn't touch individual
+audio files, tags, or the `.m3u`.
+
+- `--releaseinfo <path>` -- the corrected metadata file to apply. Required.
+- `--dest <path>` -- the packaged release folder to update. Required. If the
+  artist or title differs from what's currently there, prompts for `y`/`n`
+  confirmation on stdin before proceeding.
+
+#### `id-txt --releaseinfo <path> [--dest <path>]`
+
+Generate `id.txt` from a saved `releaseinfo.json`, written to `{dest}/id.txt`.
+One file per release -- for a multi-disc release, put it in the folder that
+contains `cd1/`, `cd2/`, etc., not inside a disc subfolder. No network calls.
+
+- `--releaseinfo <path>` -- the metadata file to render. Required.
+- `--dest <path>` -- folder to write `id.txt` into. Default `.`.
 
 ### Convert
 
 Rip a disc and turn it into FLAC/MP3 output.
 
-| Command | Description |
-| --- | --- |
-| `pipeline [--releaseinfo <path>] [--device <path>] [--dest <path>] [--multi <start>-<end>] [--no-flac] [--no-mp3] [--keep-wav] [--fast-toc] [--overread] [--skip-overread-on-stall] [--no-verify] [--retries <n>] [--max-sector-reads <n>] [--stall-timeout <seconds>]` | The full rip → FLAC-packaging → MP3 pipeline in one command. Resolves the release the same way `make-releaseinfo` does (or loads `--releaseinfo` directly) and always saves a working `{dest}/releaseinfo.json` copy (removed again once
-every disc in a run covering the whole release has been packaged -- left in
-place for `--no-flac` runs or a partial `--multi` range, since nothing else
-would otherwise hold that resolved metadata), then rips/packages every disc in range (default: all of them; `--multi 1-3` limits the run), prompting to swap discs between each one on a multi-disc release. `--no-flac` skips FLAC packaging and keeps the raw rip output on disk unorganized instead of deleting it; `--no-mp3` skips MP3 encoding for this run (default comes from the config file's `makeMp3`); `--keep-wav` retains each track's accepted WAV alongside its `.flac`. A track that can't be read after retries doesn't abort the disc -- whatever was captured is still packaged, with a warning printed. The TOC read scans every track's pregap by default (costing roughly a second per track or more); `--fast-toc` skips that scan and reports only track 1's pregap, same as `toc`'s default (note the opposite polarity -- `pipeline`/`rip` scan by default, `toc` doesn't). `--overread` passes `--force-overread` for the disc's boundary track only (also forced on for a drive with a `true` entry in the config file's `overreads` map) -- not every drive supports it, and it's known to hang cd-paranoia outright on at least one drive; see "`--overread` and `--skip-overread-on-stall`" above. `--skip-overread-on-stall` recovers a stalled overread attempt by finishing that track with the boundary silence-filled instead of marking it degraded. `--no-verify` switches to a single-pass ("Burst") read per track instead of the default test+copy CRC32 compare -- AccurateRip's own whole-disc check still runs regardless, and cannot be combined with `--max-sector-reads`/`--stall-timeout`. `--retries <n>` overrides how many test+copy cycles a track gets before giving up (default 5, `0` = none). `--max-sector-reads <n>` caps cd-paranoia's own per-sector retries (its `--never-skip`; default 12 or the config file's `maxSectorReads`, `0` = retry forever). `--stall-timeout <seconds>` kills and retries a single cd-paranoia read that reports no forward progress for that long (default 1200 or the config file's `stallTimeoutSeconds`, `0` disables it) -- this is what stops a wedged read (e.g. a `--force-overread` hang) from running forever, but it stacks multiplicatively with `--retries`: a track's worst case is roughly `stall-timeout × (2, or 1 with --no-verify) × retries`, so the defaults' own worst case is a few hours per bad track, not unbounded. |
-| `rip --releaseinfo <path> [--device <path>] [--dest <path>] [--disc <N>] [--keep-wav] [--fast-toc] [--overread] [--skip-overread-on-stall] [--no-verify] [--retries <n>] [--max-sector-reads <n>] [--stall-timeout <seconds>]` | Rip the disc in the drive: `cdrdao` reads the TOC, then for every audio track `cd-paranoia` does a test/copy read-and-verify, `flac --verify` encodes the accepted WAV (tagged), and finally an AccurateRip database lookup verifies the whole disc's checksums. Writes an EAC-style rip log (`{dest}/{Artist} - {Title}.log`) with drive/settings info, the full TOC, and per-track peak/speed/CRC/AccurateRip results. `--disc <N>` is required for releases with more than one disc. `--keep-wav` retains each track's accepted WAV alongside its `.flac` instead of deleting it after a successful encode. A track that can't be read after retries is skipped (warned about, not fatal) rather than aborting the disc. The TOC read scans every track's pregap by default (costing roughly a second per track or more); `--fast-toc` skips that scan and reports only track 1's pregap. `--overread`/`--skip-overread-on-stall` work exactly as described under `pipeline` above (scoped to the disc's boundary track only). `--no-verify`/`--retries`/`--max-sector-reads`/`--stall-timeout` work exactly as described under `pipeline` above. |
-| `flac --releaseinfo <path> --source <path> [--dest <path>] [--disc <N>]` | Package a rip's FLAC output (`--source`, from `rip`'s `--dest`) into `{Artist} - {Title} [flac {Year}]/` under `--dest` (default `.`). `--disc <N>` is required for releases with more than one disc (files go in `cd1/`, `cd2/`, etc.). Moves the FLAC files (and any retained `.wav` files, from `rip --keep-wav`) and the rip log written by `rip`/`pipeline`, writes this disc's `.cue` sheet (`CATALOG`/`ISRC`/pregap data from the disc's TOC where known), then writes/refreshes `id.txt`, `releaseinfo.json`, `checksum_sha256.txt` (covering the `.flac`, `.log`, and `.cue` files only -- see Verify below), `.m3u`, and cover art (best-effort, from the MusicBrainz Cover Art Archive) at the release level. Not written for `mp3`'s output -- a cue sheet exists to make a rip losslessly reconstructible to disc, which a lossy MP3 encode can't serve. Safe to run once per disc across separate sessions. |
-| `mp3 --releaseinfo <path> --source <path> [--dest <path>] [--disc <N>]` | Encode a `flac`-packaged disc folder (`--source`) to V0 MP3 via `lame` into `{Artist} - {Title} [mp3 v0 {Year}]/` under `--dest` (default `.`). `--disc <N>` is required for releases with more than one disc. Fully tags each MP3 (title/artist/album/album artist/year/track/genre -- no embedded cover art, by user decision; cover art is still copied alongside the MP3s from the FLAC folder, never re-fetched) in one `lame` invocation per track, then writes/refreshes `id.txt`, `releaseinfo.json`, `checksum_sha256.txt` (covering the `.mp3` and `.log` files only), `.m3u`, and its own log (OS info, timestamps, lame version -- independent of the FLAC log) at the release level. No network calls. Safe to run once per disc across separate sessions. |
+#### `pipeline [--releaseinfo <path>] [--device <path>] [--dest <path>] [--multi <start>-<end>] [--no-flac] [--no-mp3] [--keep-wav] [--fast-toc] [--overread] [--skip-overread-on-stall] [--no-verify] [--retries <n>] [--max-sector-reads <n>] [--stall-timeout <seconds>]`
+
+The full rip -> FLAC-packaging -> MP3 pipeline in one command. Resolves the
+release the same way `make-releaseinfo` does (or loads `--releaseinfo`
+directly) and always saves a working `{dest}/releaseinfo.json` copy (removed
+again once every disc in a run covering the whole release has been packaged
+-- left in place for `--no-flac` runs or a partial `--multi` range, since
+nothing else would otherwise hold that resolved metadata), then
+rips/packages every disc in range, prompting to swap discs between each one
+on a multi-disc release. A track that can't be read after retries doesn't
+abort the disc -- whatever was captured is still packaged, with a warning
+printed.
+
+- `--releaseinfo <path>` -- use this file's content instead of a fresh
+  MusicBrainz lookup.
+- `--device <path>` -- the drive to rip from. Defaults to the config file's
+  `device`, else `/dev/sr1`.
+- `--dest <path>` -- folder to write output into. Default `.`.
+- `--multi <start>-<end>` -- limits the run to a range of discs (e.g. `1-3`).
+  Default: every disc in the release.
+- `--no-flac` -- skip FLAC packaging and keep the raw rip output on disk
+  unorganized instead of deleting it.
+- `--no-mp3` -- skip MP3 encoding for this run. Default comes from the
+  config file's `makeMp3`.
+- `--keep-wav` -- retain each track's accepted WAV alongside its `.flac`.
+- `--fast-toc` -- skip the per-track pregap scan (which otherwise costs
+  roughly a second per track or more) and report only track 1's pregap, same
+  as `toc`'s default. Note the opposite polarity from `toc`: `pipeline`/`rip`
+  scan by default, `toc` doesn't.
+- `--overread` -- pass `--force-overread` for the disc's boundary track only
+  (also forced on for a drive with a `true` entry in the config file's
+  `overreads` map). Not every drive supports it, and it's known to hang
+  cd-paranoia outright on at least one drive; see "`--overread` and
+  `--skip-overread-on-stall`" above.
+- `--skip-overread-on-stall` -- recover a stalled overread attempt by
+  finishing that track with the boundary silence-filled instead of marking
+  it degraded.
+- `--no-verify` -- switch to a single-pass ("Burst") read per track instead
+  of the default test+copy CRC32 compare. AccurateRip's own whole-disc check
+  still runs regardless. Cannot be combined with `--max-sector-reads`/
+  `--stall-timeout`.
+- `--retries <n>` -- how many test+copy cycles a track gets before giving up.
+  Default 5, `0` = none.
+- `--max-sector-reads <n>` -- caps cd-paranoia's own per-sector retries (its
+  `--never-skip`). Default 12 or the config file's `maxSectorReads`, `0` =
+  retry forever.
+- `--stall-timeout <seconds>` -- kills and retries a single cd-paranoia read
+  that reports no forward progress for that long. Default 120 or the config
+  file's `stallTimeoutSeconds`, `0` disables it. This is what stops a wedged
+  read (e.g. a `--force-overread` hang) from running forever, but it stacks
+  multiplicatively with `--retries`: a track's worst case is roughly
+  `stall-timeout × (2, or 1 with --no-verify) × retries`, so the defaults'
+  own worst case is around 20 minutes per bad track, not unbounded.
+
+#### `rip --releaseinfo <path> [--device <path>] [--dest <path>] [--disc <N>] [--keep-wav] [--fast-toc] [--overread] [--skip-overread-on-stall] [--no-verify] [--retries <n>] [--max-sector-reads <n>] [--stall-timeout <seconds>]`
+
+Rip the disc in the drive: `cdrdao` reads the TOC, then for every audio track
+`cd-paranoia` does a test/copy read-and-verify, `flac --verify` encodes the
+accepted WAV (tagged), and finally an AccurateRip database lookup verifies
+the whole disc's checksums. Writes an EAC-style rip log
+(`{dest}/{Artist} - {Title}.log`) with drive/settings info, the full TOC, and
+per-track peak/speed/CRC/AccurateRip results. A track that can't be read
+after retries is skipped (warned about, not fatal) rather than aborting the
+disc.
+
+- `--releaseinfo <path>` -- the release metadata to rip against. Required.
+- `--device <path>` -- the drive to rip from. Defaults to the config file's
+  `device`, else `/dev/sr1`.
+- `--dest <path>` -- folder to write output into. Default `.`.
+- `--disc <N>` -- which disc of the release this is. Required for releases
+  with more than one disc.
+- `--keep-wav`, `--fast-toc`, `--overread`, `--skip-overread-on-stall`,
+  `--no-verify`, `--retries <n>`, `--max-sector-reads <n>`,
+  `--stall-timeout <seconds>` -- work exactly as described under `pipeline`
+  above.
+
+#### `flac --releaseinfo <path> --source <path> [--dest <path>] [--disc <N>]`
+
+Package a rip's FLAC output into `{Artist} - {Title} [flac {Year}]/`. Moves
+the FLAC files (and any retained `.wav` files, from `rip --keep-wav`) and the
+rip log written by `rip`/`pipeline`, writes this disc's `.cue` sheet
+(`CATALOG`/`ISRC`/pregap data from the disc's TOC where known), then
+writes/refreshes `id.txt`, `releaseinfo.json`, `checksum_sha256.txt`
+(covering the `.flac`, `.log`, and `.cue` files only -- see Verify below),
+`.m3u`, and cover art (best-effort, from the MusicBrainz Cover Art Archive)
+at the release level. Not written for `mp3`'s output -- a cue sheet exists to
+make a rip losslessly reconstructible to disc, which a lossy MP3 encode can't
+serve. Safe to run once per disc across separate sessions.
+
+- `--releaseinfo <path>` -- the release metadata to package against. Required.
+- `--source <path>` -- the folder `rip` wrote its output to. Required.
+- `--dest <path>` -- folder to write the packaged release into. Default `.`.
+- `--disc <N>` -- which disc of the release this is (files go in `cd1/`,
+  `cd2/`, etc.). Required for releases with more than one disc.
+
+#### `mp3 --releaseinfo <path> --source <path> [--dest <path>] [--disc <N>]`
+
+Encode a `flac`-packaged disc folder to V0 MP3 via `lame` into
+`{Artist} - {Title} [mp3 v0 {Year}]/`. Fully tags each MP3
+(title/artist/album/album artist/year/track/genre -- no embedded cover art,
+by user decision; cover art is still copied alongside the MP3s from the FLAC
+folder, never re-fetched) in one `lame` invocation per track, then
+writes/refreshes `id.txt`, `releaseinfo.json`, `checksum_sha256.txt`
+(covering the `.mp3` and `.log` files only), `.m3u`, and its own log (OS
+info, timestamps, lame version -- independent of the FLAC log) at the release
+level. No network calls. Safe to run once per disc across separate sessions.
+
+- `--releaseinfo <path>` -- the release metadata to encode against. Required.
+- `--source <path>` -- a `flac`-packaged disc folder. Required.
+- `--dest <path>` -- folder to write the MP3 release into. Default `.`.
+- `--disc <N>` -- which disc of the release this is. Required for releases
+  with more than one disc.
 
 ### Verify
 
 Hash/check a folder's contents against a manifest -- independent of any particular release format.
 
-| Command | Description |
-| --- | --- |
-| `make-checksum [--dest <path>]` | Recursively hash every file under a folder (except the manifest itself) and write `{dest}/checksum_sha256.txt` (default dest `.`). Not filtered by extension -- works on any folder, not just a FLAC/MP3 release folder. This is a distinct, deliberately format-agnostic tool: it hashes everything, unlike the `flac`/`mp3` commands' own manifest (audio + log only), so running it over a packaged release folder produces a broader manifest than packaging did. |
-| `compare-checksum [--dest <path>]` | Read `{dest}/checksum_sha256.txt` and compare it against what's actually there: reports matched/mismatched/missing/malformed/extra counts (with details for anything not matched). A manifest entry whose path escapes the target folder (`..` traversal or an absolute path) is reported as "malformed" and neither read nor hashed. Exits `0` unless something listed in the manifest is mismatched, missing, or malformed; `1` otherwise -- files present on disk but not listed in the manifest ("extra") are reported but don't affect the exit code, since a packaged release folder always has some (`id.txt`, `releaseinfo.json`, cover art, `.m3u`) by design. |
+#### `make-checksum [--dest <path>]`
+
+Recursively hash every file under a folder (except the manifest itself) and
+write `{dest}/checksum_sha256.txt`. Not filtered by extension -- works on any
+folder, not just a FLAC/MP3 release folder. This is a distinct, deliberately
+format-agnostic tool: it hashes everything, unlike the `flac`/`mp3`
+commands' own manifest (audio + log only), so running it over a packaged
+release folder produces a broader manifest than packaging did.
+
+- `--dest <path>` -- folder to hash and write the manifest into. Default `.`.
+
+#### `compare-checksum [--dest <path>]`
+
+Read `{dest}/checksum_sha256.txt` and compare it against what's actually
+there: reports matched/mismatched/missing/malformed/extra counts (with
+details for anything not matched). A manifest entry whose path escapes the
+target folder (`..` traversal or an absolute path) is reported as "malformed"
+and neither read nor hashed. Exits `0` unless something listed in the
+manifest is mismatched, missing, or malformed; `1` otherwise -- files present
+on disk but not listed in the manifest ("extra") are reported but don't
+affect the exit code, since a packaged release folder always has some
+(`id.txt`, `releaseinfo.json`, cover art, `.m3u`) by design.
+
+- `--dest <path>` -- folder to check against its manifest. Default `.`.
 
 ### Info
 
-| Command | Description |
-| --- | --- |
-| `help` / `--help` / `-h` | Show usage. |
-| `--version` / `-v` | Show the current version. |
-| `<command> --debug` | Print the full stack trace for an unhandled exception instead of a one-line message (same effect as setting the `WHATINATOR_DEBUG` environment variable). Must come after the command name, like any other flag. |
+- `help` / `--help` / `-h` -- show usage.
+- `--version` / `-v` -- show the current version.
+- `<command> --debug` -- print the full stack trace for an unhandled
+  exception instead of a one-line message (same effect as setting the
+  `WHATINATOR_DEBUG` environment variable). Must come after the command
+  name, like any other flag.
 
 ## Layout
 

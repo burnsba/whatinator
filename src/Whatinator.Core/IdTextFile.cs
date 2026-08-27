@@ -166,7 +166,13 @@ public static class IdTextFile
     /// Appends one disc's tracks as <c>NN Title  m:ss</c> lines, with the
     /// duration column aligned to the longest title in this disc -- capped
     /// so no line exceeds <see cref="MaxLineLength"/> unless an individual
-    /// title alone is too long to fit regardless of padding.
+    /// title alone is too long to fit regardless of padding. Durations are
+    /// right-aligned (left-padded) to the widest duration on the disc, so a
+    /// disc mixing single- and double-digit minute counts (e.g. <c>4:04</c>
+    /// next to <c>11:05</c>) still lines up its <c>:</c> separators in one
+    /// column -- since seconds are always two digits, padding the whole
+    /// duration string to a common width necessarily puts every colon at the
+    /// same offset.
     /// </summary>
     /// <param name="text">The buffer to append to.</param>
     /// <param name="tracks">The disc's tracks, in order.</param>
@@ -187,7 +193,8 @@ public static class IdTextFile
         {
             var number = tracks[i].Number.ToString("D2", CultureInfo.InvariantCulture);
             var paddedTitle = tracks[i].Title.PadRight(titleColumnWidth + TitleDurationGap);
-            text.Append(number).Append(' ').Append(paddedTitle).Append(durations[i]).Append('\n');
+            var paddedDuration = durations[i].PadLeft(maxDurationWidth);
+            text.Append(number).Append(' ').Append(paddedTitle).Append(paddedDuration).Append('\n');
         }
     }
 

@@ -46,7 +46,7 @@ public static class CliArgumentParsing
     /// Resolves <c>--retries</c>/<c>--max-sector-reads</c>/<c>--stall-timeout</c>
     /// for <c>rip</c>/<c>pipeline</c>: an explicit CLI value wins, falling back
     /// to <paramref name="config"/>'s value, falling back to a hardcoded
-    /// default (5 / 12 / 1200). Also enforces that
+    /// default (5 / 12 / 120). Also enforces that
     /// <paramref name="maxSectorReadsArg"/>/<paramref name="stallTimeoutArg"/>
     /// cannot be given alongside <paramref name="noVerify"/> -- tuning the
     /// robustness knobs while also opting out of local verification is a
@@ -126,7 +126,7 @@ public static class CliArgumentParsing
 
         if (stallTimeoutArg is null)
         {
-            stallTimeoutSeconds = config.StallTimeoutSeconds ?? 1200;
+            stallTimeoutSeconds = config.StallTimeoutSeconds ?? 120;
         }
 
         error = null;

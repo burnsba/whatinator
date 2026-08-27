@@ -60,7 +60,7 @@ namespace Whatinator.Core;
 /// The default stall timeout in seconds (see
 /// <see cref="Rip.CdParanoiaTrackOptions.StallTimeoutSeconds"/>), used when
 /// <c>rip</c>/<c>pipeline</c>'s <c>--stall-timeout</c> isn't given.
-/// <see langword="null"/> means the CLI's own hardcoded default (1200)
+/// <see langword="null"/> means the CLI's own hardcoded default (120)
 /// applies.
 /// </param>
 public sealed record WhatinatorConfig(

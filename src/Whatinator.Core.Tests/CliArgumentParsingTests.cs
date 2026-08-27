@@ -110,7 +110,7 @@ public class CliArgumentParsingTests : IDisposable
         Assert.Null(error);
         Assert.Equal(5, maxRetries);
         Assert.Equal(12, maxSectorReads);
-        Assert.Equal(1200, stallTimeoutSeconds);
+        Assert.Equal(120, stallTimeoutSeconds);
     }
 
     [Fact]
@@ -186,6 +186,6 @@ public class CliArgumentParsingTests : IDisposable
         Assert.Null(error);
         Assert.Equal(3, maxRetries);
         Assert.Equal(12, maxSectorReads);
-        Assert.Equal(1200, stallTimeoutSeconds);
+        Assert.Equal(120, stallTimeoutSeconds);
     }
 }

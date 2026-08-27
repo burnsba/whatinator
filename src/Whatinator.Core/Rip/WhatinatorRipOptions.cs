@@ -57,5 +57,5 @@ public sealed record WhatinatorRipOptions(
     int MaxRetries = 5,
     bool Verify = true,
     int MaxSectorReads = 12,
-    int StallTimeoutSeconds = 1200,
+    int StallTimeoutSeconds = 120,
     bool SkipOverreadOnStall = false);

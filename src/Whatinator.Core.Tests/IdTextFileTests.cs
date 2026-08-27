@@ -195,6 +195,22 @@ public class IdTextFileTests
     }
 
     [Fact]
+    public void Format_RightAlignsDurationsWithDifferingMinuteDigitCounts()
+    {
+        List<TrackInfo> tracks =
+        [
+            new TrackInfo(5, "Oh, Sister", "Bob Dylan", TimeSpan.FromSeconds(244)),
+            new TrackInfo(6, "Joey", "Bob Dylan", TimeSpan.FromSeconds(665)),
+        ];
+        var releaseInfo = CreateReleaseInfo(media: [new MediumInfo(1, null, tracks)]);
+
+        var text = IdTextFile.Format(releaseInfo);
+
+        Assert.Contains("05 Oh, Sister   4:04\n", text, StringComparison.Ordinal);
+        Assert.Contains("06 Joey        11:05\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Format_CapsAlignmentAt80Chars_WithoutDraggingOtherLinesOut()
     {
         var longTitle = new string('x', 100);
