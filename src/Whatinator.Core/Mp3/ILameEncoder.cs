@@ -15,7 +15,7 @@ public interface ILameEncoder
     /// <param name="standardOutput">The stream to relay lame's stdout into.</param>
     /// <param name="standardError">The stream to relay lame's stderr into.</param>
     /// <param name="cancellationToken">A token to cancel the encode.</param>
-    /// <returns>The encode's outcome, including a raw capture of lame's stderr for the MP3 log.</returns>
+    /// <returns>The encode's outcome, including lame's stderr filtered down to its final summary for the MP3 log (see <see cref="LameEncodeResult.CapturedOutput"/>).</returns>
     Task<LameEncodeResult> EncodeAsync(
         LameEncodeOptions options,
         Stream standardOutput,

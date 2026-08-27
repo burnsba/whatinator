@@ -135,9 +135,16 @@ public class LameEncoderTests : IDisposable
 
         var result = await encoder.EncodeAsync(CreateOptions() with { InputFlacPath = flacPath, OutputMp3Path = mp3Path }, stdout, stderr, CancellationToken.None);
 
+        var rawOutput = System.Text.Encoding.UTF8.GetString(stderr.ToArray());
+
         Assert.True(result.Success);
-        Assert.Contains("LAME", result.CapturedOutput, StringComparison.Ordinal);
-        Assert.Equal(System.Text.Encoding.UTF8.GetString(stderr.ToArray()), result.CapturedOutput);
+
+        // CapturedOutput is LameOutputFilter.ExtractSummary's output, not
+        // lame's raw stderr (see LameOutputFilter for why): the live
+        // progress banner/redraws are gone, but the final summary survives.
+        Assert.NotEqual(rawOutput, result.CapturedOutput);
+        Assert.DoesNotContain('\x1B', result.CapturedOutput);
+        Assert.Contains("kbps", result.CapturedOutput, StringComparison.Ordinal);
     }
 
     private static Dictionary<string, string> ReadTags(string mp3Path)

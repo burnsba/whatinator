@@ -173,9 +173,46 @@ internal static class PipelineCommand
             }
         }
 
+        CleanUpWorkingReleaseInfo(dest, noFlac, startDisc, endDisc, releaseInfo);
+
         Console.WriteLine();
         Console.WriteLine($"Pipeline complete: {releaseInfo.Artist} - {releaseInfo.Title}");
         return 0;
+    }
+
+    /// <summary>
+    /// Deletes the working <c>releaseinfo.json</c> copy <see cref="ResolveReleaseInfoAsync"/>
+    /// wrote to <paramref name="dest"/>, once it's no longer needed.
+    /// </summary>
+    /// <remarks>
+    /// Only deleted when every disc of the release was just packaged: with
+    /// <c>--no-flac</c>, no container-level copy is ever written (see
+    /// <c>FlacPackager</c>/<c>ReleasePackageArtifacts</c>), so this working
+    /// copy is the only surviving record of the resolved metadata and must
+    /// stay; with a partial <c>--multi</c> range, a later invocation for the
+    /// remaining discs still needs it. Best-effort: a failed cleanup
+    /// shouldn't fail an otherwise-successful run.
+    /// </remarks>
+    /// <param name="dest">The <c>--dest</c> folder <see cref="ResolveReleaseInfoAsync"/> wrote into.</param>
+    /// <param name="noFlac">Whether <c>--no-flac</c> was given.</param>
+    /// <param name="startDisc">The first disc number this invocation covered.</param>
+    /// <param name="endDisc">The last disc number this invocation covered.</param>
+    /// <param name="releaseInfo">The resolved release.</param>
+    private static void CleanUpWorkingReleaseInfo(string dest, bool noFlac, int startDisc, int endDisc, ReleaseInfo releaseInfo)
+    {
+        if (noFlac || startDisc != 1 || endDisc != releaseInfo.Media.Count)
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(Path.Combine(dest, "releaseinfo.json"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not fatal -- the file just gets left behind, same as before this cleanup existed.
+        }
     }
 
     /// <summary>Loads <c>--releaseinfo</c>, or resolves it from the disc in the drive (same as <c>make-releaseinfo</c>), and always writes a copy to <paramref name="dest"/>.</summary>

@@ -21,7 +21,14 @@ public sealed class LameEncoder : ILameEncoder
     /// <param name="standardOutput">The stream to relay lame's stdout into.</param>
     /// <param name="standardError">The stream to relay lame's stderr into.</param>
     /// <param name="cancellationToken">A token to cancel the encode.</param>
-    /// <returns>The encode's outcome, including a raw capture of lame's stderr (confirmed live: lame writes everything -- banner, progress, tag/ReplayGain summary -- to stderr, never stdout) for the MP3 log.</returns>
+    /// <returns>
+    /// The encode's outcome, including lame's captured stderr for the MP3
+    /// log (confirmed live: lame writes everything -- banner, progress,
+    /// tag/ReplayGain summary -- to stderr, never stdout), filtered down to
+    /// the final summary by <see cref="LameOutputFilter.ExtractSummary"/> --
+    /// the raw capture is mostly repeated live-progress redraws laden with
+    /// ANSI control codes, not something worth keeping verbatim in a log file.
+    /// </returns>
     public async Task<LameEncodeResult> EncodeAsync(
         LameEncodeOptions options,
         Stream standardOutput,
@@ -39,7 +46,8 @@ public sealed class LameEncoder : ILameEncoder
             (reader, ct) => ProcessOutputRelay.RelayAsync(reader.BaseStream, standardError, ct, capturedError),
             cancellationToken).ConfigureAwait(false);
 
-        return new LameEncodeResult(exitCode, Encoding.UTF8.GetString(capturedError.ToArray()));
+        var rawOutput = Encoding.UTF8.GetString(capturedError.ToArray());
+        return new LameEncodeResult(exitCode, LameOutputFilter.ExtractSummary(rawOutput));
     }
 
     /// <summary>Builds the <c>lame</c> process start info for <paramref name="options"/>.</summary>

@@ -119,9 +119,15 @@ public static class WhatinatorEacLog
 
         // The disc's own CATALOG line (UPC/EAN), from DiscToc -- distinct
         // from any MusicBrainz label catalog number, which this log never
-        // prints (see root CLAUDE.md's ISRC/UPC gotcha).
-        text.Append($"Disc catalogue number (UPC/EAN)             : {o.Toc.CatalogNumber ?? "none"}\n");
-        text.Append('\n');
+        // prints (see root CLAUDE.md's ISRC/UPC gotcha). Omitted entirely
+        // when the disc has none, matching real EAC (none of the example
+        // logs on hand carry this line at all) rather than printing a
+        // placeholder value.
+        if (o.Toc.CatalogNumber is not null)
+        {
+            text.Append($"Disc catalogue number (UPC/EAN)             : {o.Toc.CatalogNumber}\n");
+            text.Append('\n');
+        }
 
         // WhatinatorRipRunner does the cd-paranoia test+copy double-read
         // cycle by default, EAC's own Burst/Secure distinction boiling down
@@ -183,6 +189,14 @@ public static class WhatinatorEacLog
         // FlacEncoder.BuildStartInfo (phase 015) passes no -0..-8 flag, so
         // this is flac's own documented default.
         AppendEncoderSetting(text, "Quality", "-5 (flac default compression level)");
+
+        // "No" is correct, not a placeholder: flac has no ID3 support at all
+        // (confirmed against `flac --help`) -- the "Additional command line
+        // options" line below's -T flags set FLAC's own native Vorbis-comment
+        // block, a different tagging mechanism entirely. A real EAC log (e.g.
+        // example/Bob Dylan - Desire.log) shows "Yes" here, but that's a
+        // property of a real Windows EAC session's own encoder invocation,
+        // not of anything whatinator's FlacEncoder.BuildStartInfo does.
         AppendEncoderSetting(text, "Add ID3 tag", "No");
 
         // FlacVersion already carries the tool's own name ("flac 1.5.0").

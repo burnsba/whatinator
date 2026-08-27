@@ -43,7 +43,7 @@ Project reference: `Whatinator.LibDiscId`.
 | `Drive/` | Physical drive concerns: `OpticalDriveLocator` (sysfs enumeration), `OffsetFinder` (AccurateRip-confirmed read-offset calibration), `CacheDefeatAnalyzer` (`cd-paranoia -A`). |
 | `Flac/` | `FlacEncoder` (`flac --verify`, tagged) and `FlacPackager` (release folder assembly). |
 | `Metadata/` | The editorial model (`ReleaseInfo`/`MediumInfo`/`TrackInfo`), its JSON file (`ReleaseInfoFile`), lookup orchestration (`MetadataService`), and the corrections path (`MetadataUpdater`). |
-| `Mp3/` | `LameEncoder`/`ILameEncoder` (V0), `Mp3Packager`, `Mp3LogFile`. |
+| `Mp3/` | `LameEncoder`/`ILameEncoder` (V0), `Mp3Packager`, `Mp3LogFile`, `LameOutputFilter` (strips lame's live-progress redraws down to its final summary for the log). |
 | `MusicBrainz/` | `MusicBrainzClient` plus the `Mb*` DTOs (all `internal` -- they never leak past the client). |
 | `Naming/` | Every filesystem name decision. `FileNameSanitizer`, `ReleaseFolderNaming` (includes `ContainerFolderName`, parameterized by format tag), `TrackFileNaming`. |
 | `Rip/` | The extraction path. `CdParanoiaTrackReader`, its progress parsing trio (`CdParanoiaProgressLine`/`CdParanoiaProgressReporter`/`CdParanoiaLiveOutputFilter`), `WhatinatorRipRunner`, `PipelineRunner`, `WhatinatorEacLog`, `TrackFileMatcher`, `ProcessOutputRelay`, `ProcessCancellation`, `SubprocessRunner` (the shared start/drain/kill-on-cancel sequence every subprocess wrapper in Core uses, not just this folder's). |
