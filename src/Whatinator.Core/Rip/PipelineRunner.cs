@@ -76,7 +76,11 @@ public sealed class PipelineRunner
             DiscNumber: isMultiDisc ? discNumber : null,
             Offset: options.Offset ?? 0,
             Overread: options.Overread,
-            KeepWav: options.KeepWav);
+            KeepWav: options.KeepWav,
+            MaxRetries: options.MaxRetries,
+            Verify: options.Verify,
+            MaxSectorReads: options.MaxSectorReads,
+            StallTimeoutSeconds: options.StallTimeoutSeconds);
 
         // Local time, deliberately -- matches RipOutputTimestamp's console
         // prefix, Mp3Packager's log timestamps, and EAC's own convention.
@@ -124,7 +128,8 @@ public sealed class PipelineRunner
                 options.Environment.Uname,
                 options.Environment.OsPrettyName,
                 startTime,
-                endTime);
+                endTime,
+                options.Verify);
             var releaseDisplayName = ReleaseFolderNaming.ReleaseDisplayName(options.ReleaseInfo);
             WhatinatorEacLog.Write(logOptions, Path.Combine(rawDir, releaseDisplayName + ".log"));
         }

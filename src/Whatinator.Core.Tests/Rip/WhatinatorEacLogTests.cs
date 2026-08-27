@@ -18,6 +18,17 @@ public class WhatinatorEacLogTests
     private static readonly DateTimeOffset EndTime = new(2026, 8, 17, 9, 12, 30, TimeSpan.FromHours(-5));
 
     [Fact]
+    public void Format_ShowsBurstReadModeAndUnavailableTestCrc_WhenVerifyIsFalse()
+    {
+        var text = WhatinatorEacLog.Format(CreateOptions(verify: false));
+
+        Assert.Contains("Read mode : Burst\n", text, StringComparison.Ordinal);
+        Assert.Contains("     Test CRC N/A (verification disabled)\n", text, StringComparison.Ordinal);
+        Assert.Contains("     Copy CRC 828BDB5E\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Read mode : Secure\n", text);
+    }
+
+    [Fact]
     public void Format_IncludesHeaderDriveAndSettingsSections()
     {
         var text = WhatinatorEacLog.Format(CreateOptions());
@@ -351,7 +362,7 @@ public class WhatinatorEacLogTests
         Attempts: 1,
         ElapsedTime: ElapsedTime);
 
-    private static EacLogOptions CreateOptions(bool accurateRipFound = false, AccurateRipTrackMatch? match = null)
+    private static EacLogOptions CreateOptions(bool accurateRipFound = false, AccurateRipTrackMatch? match = null, bool verify = true)
     {
         var toc = new DiscToc([new DiscTocTrack(1, 150, 16627, IsAudio: true, PregapFrames: 150)]);
 
@@ -399,6 +410,7 @@ public class WhatinatorEacLogTests
             Uname: "Linux host",
             OsPrettyName: "Debian GNU/Linux 13 (trixie)",
             StartTime: StartTime,
-            EndTime: EndTime);
+            EndTime: EndTime,
+            Verify: verify);
     }
 }

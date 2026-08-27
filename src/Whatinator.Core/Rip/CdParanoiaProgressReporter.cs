@@ -41,6 +41,7 @@ internal sealed class CdParanoiaProgressReporter
     private int _readNumber = 1;
     private int _totalReads = 1;
     private DateTime _lastStatus = DateTime.MinValue;
+    private DateTime _lastProgressAt = DateTime.UtcNow;
 
     /// <summary>Initializes a new instance of the <see cref="CdParanoiaProgressReporter"/> class.</summary>
     /// <param name="output">The stream to write status lines into.</param>
@@ -52,6 +53,16 @@ internal sealed class CdParanoiaProgressReporter
 
     /// <summary>Computes the fraction of the current read's track processed so far, in <c>[0, 100]</c>.</summary>
     internal double Percent => _totalFrames <= 0 ? 0 : Math.Clamp(_furthestFrame * 100.0 / _totalFrames, 0, 100);
+
+    /// <summary>
+    /// How long it's been since <see cref="Feed"/> last observed forward
+    /// progress (<see cref="_furthestFrame"/> advancing), or since
+    /// <see cref="BeginRead"/> if none has been observed yet this read --
+    /// what <see cref="StallMonitor"/> polls to detect a hung cd-paranoia
+    /// invocation (see root <c>CLAUDE.md</c>'s <c>--force-overread</c> hang
+    /// gotcha).
+    /// </summary>
+    internal TimeSpan TimeSinceProgress => DateTime.UtcNow - _lastProgressAt;
 
     /// <summary>
     /// Resets per-read state (frame progress, event counts, the 20-second
@@ -85,6 +96,7 @@ internal sealed class CdParanoiaProgressReporter
         _readNumber = readNumber;
         _totalReads = totalReads;
         _lastStatus = DateTime.UtcNow;
+        _lastProgressAt = DateTime.UtcNow;
         _stopwatch.Restart();
     }
 
@@ -117,6 +129,7 @@ internal sealed class CdParanoiaProgressReporter
             if (frame > _furthestFrame)
             {
                 _furthestFrame = frame;
+                _lastProgressAt = DateTime.UtcNow;
             }
         }
 

@@ -111,7 +111,17 @@ public sealed class WhatinatorRipRunner
             var wavPath = Path.Combine(options.OutputDirectory, baseFileName + ".wav");
 
             var readResult = await _trackReader.ReadTrackAsync(
-                new CdParanoiaTrackOptions(options.Device, options.Toc, tocTrack.TrackNumber, wavPath, options.Offset, options.Overread, options.MaxRetries),
+                new CdParanoiaTrackOptions(
+                    options.Device,
+                    options.Toc,
+                    tocTrack.TrackNumber,
+                    wavPath,
+                    options.Offset,
+                    options.Overread,
+                    options.MaxRetries,
+                    options.Verify,
+                    options.MaxSectorReads,
+                    options.StallTimeoutSeconds),
                 standardError,
                 cancellationToken).ConfigureAwait(false);
 

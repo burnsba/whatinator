@@ -37,7 +37,11 @@ internal static class PipelineCommand
             OptionSpec.Flag("--no-mp3"),
             OptionSpec.Flag("--keep-wav"),
             OptionSpec.Flag("--fast-toc"),
-            OptionSpec.Flag("--overread"));
+            OptionSpec.Flag("--overread"),
+            OptionSpec.Flag("--no-verify"),
+            OptionSpec.Value("--retries"),
+            OptionSpec.Value("--max-sector-reads"),
+            OptionSpec.Value("--stall-timeout"));
         if (options.HasErrors)
         {
             foreach (var error in options.Errors)
@@ -75,6 +79,22 @@ internal static class PipelineCommand
         var createMp3 = !options.HasFlag("--no-mp3") && config.MakeMp3;
         var keepWav = options.HasFlag("--keep-wav");
         var fastToc = options.HasFlag("--fast-toc");
+        var noVerify = options.HasFlag("--no-verify");
+        if (!CliArgumentParsing.TryResolveRetryOptions(
+                noVerify,
+                options.GetValue("--retries"),
+                options.GetValue("--max-sector-reads"),
+                options.GetValue("--stall-timeout"),
+                config,
+                out var retryError,
+                out var maxRetries,
+                out var maxSectorReads,
+                out var stallTimeoutSeconds))
+        {
+            Console.Error.WriteLine(retryError);
+            return 1;
+        }
+
         var isMultiDisc = releaseInfo.Media.Count > 1;
         var drive = context.ResolveDrive();
         var readOffset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release);
@@ -129,7 +149,11 @@ internal static class PipelineCommand
                         KeepWav: keepWav,
                         Environment: environment,
                         FastToc: fastToc,
-                        DiscIdMatched: discIdMatched),
+                        DiscIdMatched: discIdMatched,
+                        MaxRetries: maxRetries,
+                        Verify: !noVerify,
+                        MaxSectorReads: maxSectorReads,
+                        StallTimeoutSeconds: stallTimeoutSeconds),
                     standardOutput,
                     standardError,
                     cancellationToken).ConfigureAwait(false);

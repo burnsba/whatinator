@@ -206,4 +206,21 @@ public class WhatinatorConfigTests : IDisposable
 
         Assert.True(loaded.GetOverread("ASUS", "DRW-24F1ST"));
     }
+
+    [Fact]
+    public void MaxSectorReadsAndStallTimeoutSeconds_RoundTripThroughConfigLoader()
+    {
+        var path = Path.Combine(_tempDir, "config.json");
+        var original = new WhatinatorConfig(MaxSectorReads: 20, StallTimeoutSeconds: 600);
+
+        File.WriteAllText(path, JsonSerializer.Serialize(original, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        }));
+
+        var loaded = ConfigLoader.Load(path);
+
+        Assert.Equal(20, loaded.MaxSectorReads);
+        Assert.Equal(600, loaded.StallTimeoutSeconds);
+    }
 }

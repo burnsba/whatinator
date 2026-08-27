@@ -123,13 +123,13 @@ public static class WhatinatorEacLog
         text.Append($"Disc catalogue number (UPC/EAN)             : {o.Toc.CatalogNumber ?? "none"}\n");
         text.Append('\n');
 
-        // WhatinatorRipRunner (phase 015) always does the cd-paranoia
-        // test+copy double-read cycle, EAC's own Burst/Secure distinction
-        // boiling down to whether that verification happened -- so this is
-        // always Secure for whatinator's own rips (the real examples on
-        // hand show Burst because those source rips skipped verification,
-        // not a mode whatinator ever produces).
-        text.Append("Read mode : Secure\n");
+        // WhatinatorRipRunner does the cd-paranoia test+copy double-read
+        // cycle by default, EAC's own Burst/Secure distinction boiling down
+        // to whether that verification happened -- Secure when it did,
+        // Burst (EAC's own term, not whatinator's invention) when
+        // o.Verify is false, i.e. --no-verify's single-pass mode (see
+        // docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md).
+        text.Append(o.Verify ? "Read mode : Secure\n" : "Read mode : Burst\n");
     }
 
     /// <summary>Appends the rip settings block (offset/overread/cache/interface).</summary>
@@ -271,7 +271,15 @@ public static class WhatinatorEacLog
             // (example/Bob Dylan - Desire.log) -- see docs/track-quality.md
             // for what this number means and where it comes from.
             text.Append($"     Track quality {FormatQuality(trackResult.Quality)}\n");
-            text.Append($"     Test CRC {trackResult.Crc32:X8}\n");
+
+            // In --no-verify's single-pass mode there's no independent
+            // second read to have compared against, so "Test CRC" is
+            // reported as unavailable rather than duplicating "Copy CRC" as
+            // if a compare had actually happened (see
+            // docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md).
+            text.Append(o.Verify
+                ? $"     Test CRC {trackResult.Crc32:X8}\n"
+                : "     Test CRC N/A (verification disabled)\n");
             text.Append($"     Copy CRC {trackResult.Crc32:X8}\n");
             text.Append($"     {FormatAccurateRipLine(o.RipResult.AccurateRipFound, trackResult.AccurateRip)}\n");
 

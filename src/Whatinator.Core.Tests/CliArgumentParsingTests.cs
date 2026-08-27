@@ -99,4 +99,93 @@ public class CliArgumentParsingTests : IDisposable
         Assert.Null(loaded);
         Assert.StartsWith($"Failed to read {path}: ", error);
     }
+
+    [Fact]
+    public void TryResolveRetryOptions_NoArgsOrConfig_UsesHardcodedDefaults()
+    {
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: false, null, null, null, new WhatinatorConfig(), out var error, out var maxRetries, out var maxSectorReads, out var stallTimeoutSeconds);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+        Assert.Equal(5, maxRetries);
+        Assert.Equal(12, maxSectorReads);
+        Assert.Equal(1200, stallTimeoutSeconds);
+    }
+
+    [Fact]
+    public void TryResolveRetryOptions_ConfigValuesGiven_UsedWhenCliArgsAbsent()
+    {
+        var config = new WhatinatorConfig(MaxSectorReads: 20, StallTimeoutSeconds: 600);
+
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: false, null, null, null, config, out var error, out var maxRetries, out var maxSectorReads, out var stallTimeoutSeconds);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+        Assert.Equal(5, maxRetries);
+        Assert.Equal(20, maxSectorReads);
+        Assert.Equal(600, stallTimeoutSeconds);
+    }
+
+    [Fact]
+    public void TryResolveRetryOptions_CliArgsGiven_OverrideConfig()
+    {
+        var config = new WhatinatorConfig(MaxSectorReads: 20, StallTimeoutSeconds: 600);
+
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: false, "8", "0", "60", config, out var error, out var maxRetries, out var maxSectorReads, out var stallTimeoutSeconds);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+        Assert.Equal(8, maxRetries);
+        Assert.Equal(0, maxSectorReads);
+        Assert.Equal(60, stallTimeoutSeconds);
+    }
+
+    [Theory]
+    [InlineData("--retries", "notanumber", null, null)]
+    [InlineData("--max-sector-reads", null, "-1", null)]
+    [InlineData("--stall-timeout", null, null, "abc")]
+    public void TryResolveRetryOptions_InvalidNumber_FailsWithExpectedMessage(string optionName, string? retriesArg, string? maxSectorReadsArg, string? stallTimeoutArg)
+    {
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: false, retriesArg, maxSectorReadsArg, stallTimeoutArg, new WhatinatorConfig(), out var error, out _, out _, out _);
+
+        Assert.False(succeeded);
+        Assert.StartsWith(optionName, error);
+    }
+
+    [Fact]
+    public void TryResolveRetryOptions_NoVerifyWithMaxSectorReads_Fails()
+    {
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: true, null, "5", null, new WhatinatorConfig(), out var error, out _, out _, out _);
+
+        Assert.False(succeeded);
+        Assert.Equal("--max-sector-reads cannot be combined with --no-verify.", error);
+    }
+
+    [Fact]
+    public void TryResolveRetryOptions_NoVerifyWithStallTimeout_Fails()
+    {
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: true, null, null, "60", new WhatinatorConfig(), out var error, out _, out _, out _);
+
+        Assert.False(succeeded);
+        Assert.Equal("--stall-timeout cannot be combined with --no-verify.", error);
+    }
+
+    [Fact]
+    public void TryResolveRetryOptions_NoVerifyWithoutRetryFlags_Succeeds()
+    {
+        var succeeded = CliArgumentParsing.TryResolveRetryOptions(
+            noVerify: true, "3", null, null, new WhatinatorConfig(), out var error, out var maxRetries, out var maxSectorReads, out var stallTimeoutSeconds);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+        Assert.Equal(3, maxRetries);
+        Assert.Equal(12, maxSectorReads);
+        Assert.Equal(1200, stallTimeoutSeconds);
+    }
 }

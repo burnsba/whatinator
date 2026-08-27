@@ -28,6 +28,36 @@ namespace Whatinator.Core.Rip;
 /// The maximum number of test+copy cycles to attempt before giving up on
 /// this track.
 /// </param>
+/// <param name="Verify">
+/// Whether to perform the test/copy double-read and CRC32 compare. When
+/// <see langword="false"/> (single-pass/"fast" mode -- see
+/// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>),
+/// only one read is performed per attempt; the size check is the only local
+/// verification. AccurateRip verification is unaffected either way -- it's
+/// an independent, whole-disc check performed by <see cref="WhatinatorRipRunner"/>
+/// after every track has been read.
+/// </param>
+/// <param name="MaxSectorReads">
+/// Passed to cd-paranoia's own <c>--never-skip</c> flag, capping how many
+/// times cd-paranoia itself will retry a single bad sector before accepting
+/// it and moving on, rather than the ~20 it defaults to when the flag is
+/// omitted entirely. <c>0</c> means infinite (passes a bare
+/// <c>--never-skip</c> with no argument) -- see root <c>CLAUDE.md</c> §
+/// Gotchas' <c>--force-overread</c> hang entry for why relying on
+/// cd-paranoia's own unflagged default wasn't enough to prevent a rip
+/// running all night on one sector.
+/// </param>
+/// <param name="StallTimeoutSeconds">
+/// How many seconds a single cd-paranoia invocation (one test read, or one
+/// copy read) may go without reporting forward progress before
+/// <see cref="CdParanoiaTrackReader"/> kills it and counts the attempt as
+/// failed, letting the existing <see cref="MaxRetries"/> cycle (and
+/// eventual <see cref="CdParanoiaTrackResult.Degraded"/> path) take over
+/// instead of hanging indefinitely. <c>0</c> disables the timeout entirely.
+/// Combines multiplicatively with <see cref="MaxRetries"/> and
+/// <see cref="Verify"/> for one track's worst-case wall-clock time -- see
+/// the CLI's <c>--stall-timeout</c>/<c>--retries</c> help text.
+/// </param>
 public sealed record CdParanoiaTrackOptions(
     string Device,
     DiscToc Toc,
@@ -35,4 +65,7 @@ public sealed record CdParanoiaTrackOptions(
     string DestinationWavPath,
     int Offset = 0,
     bool Overread = false,
-    int MaxRetries = 5);
+    int MaxRetries = 5,
+    bool Verify = true,
+    int MaxSectorReads = 12,
+    int StallTimeoutSeconds = 1200);

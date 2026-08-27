@@ -45,6 +45,10 @@ namespace Whatinator.Core.Rip;
 /// annotation. <see langword="null"/> (the default) if not tracked by the
 /// caller.
 /// </param>
+/// <param name="MaxRetries">The maximum number of test+copy cd-paranoia cycles per track before giving up on it, forwarded to <see cref="WhatinatorRipOptions.MaxRetries"/>.</param>
+/// <param name="Verify">Whether to perform the test/copy double-read and CRC32 compare on every track, forwarded to <see cref="WhatinatorRipOptions.Verify"/>.</param>
+/// <param name="MaxSectorReads">The per-sector retry cap passed to cd-paranoia's <c>--never-skip</c>, forwarded to <see cref="WhatinatorRipOptions.MaxSectorReads"/>.</param>
+/// <param name="StallTimeoutSeconds">How many seconds a stalled cd-paranoia invocation is allowed before it's killed and counted as a failed attempt, forwarded to <see cref="WhatinatorRipOptions.StallTimeoutSeconds"/>.</param>
 public sealed record PipelineDiscOptions(
     ReleaseInfo ReleaseInfo,
     int? DiscNumber,
@@ -57,4 +61,8 @@ public sealed record PipelineDiscOptions(
     bool KeepWav = false,
     RipEnvironmentInfo? Environment = null,
     bool FastToc = false,
-    bool? DiscIdMatched = null);
+    bool? DiscIdMatched = null,
+    int MaxRetries = 5,
+    bool Verify = true,
+    int MaxSectorReads = 12,
+    int StallTimeoutSeconds = 1200);

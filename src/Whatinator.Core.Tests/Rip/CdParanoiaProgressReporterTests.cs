@@ -40,6 +40,29 @@ public partial class CdParanoiaProgressReporterTests
     }
 
     [Fact]
+    public void TimeSinceProgress_ResetsOnBeginRead()
+    {
+        using var stream = new MemoryStream();
+        var reporter = new CdParanoiaProgressReporter(stream);
+
+        reporter.BeginRead(stopFrame: 99);
+
+        Assert.True(reporter.TimeSinceProgress < TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void TimeSinceProgress_ResetsWhenFeedAdvancesProgress()
+    {
+        using var stream = new MemoryStream();
+        var reporter = new CdParanoiaProgressReporter(stream);
+        reporter.BeginRead(stopFrame: 99);
+
+        reporter.Feed($"##: 0 [read] @ {50 * WordsPerFrame}");
+
+        Assert.True(reporter.TimeSinceProgress < TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public void Percent_IsZero_BeforeAnyFeed()
     {
         using var stream = new MemoryStream();

@@ -38,7 +38,11 @@ internal static class RipCommand
             OptionSpec.Value("--dest"),
             OptionSpec.Flag("--keep-wav"),
             OptionSpec.Flag("--fast-toc"),
-            OptionSpec.Flag("--overread"));
+            OptionSpec.Flag("--overread"),
+            OptionSpec.Flag("--no-verify"),
+            OptionSpec.Value("--retries"),
+            OptionSpec.Value("--max-sector-reads"),
+            OptionSpec.Value("--stall-timeout"));
         if (parsedArgs.HasErrors)
         {
             foreach (var error in parsedArgs.Errors)
@@ -74,6 +78,22 @@ internal static class RipCommand
         var dest = parsedArgs.GetValue("--dest") ?? ".";
         var keepWav = parsedArgs.HasFlag("--keep-wav");
         var fastToc = parsedArgs.HasFlag("--fast-toc");
+        var noVerify = parsedArgs.HasFlag("--no-verify");
+        if (!CliArgumentParsing.TryResolveRetryOptions(
+                noVerify,
+                parsedArgs.GetValue("--retries"),
+                parsedArgs.GetValue("--max-sector-reads"),
+                parsedArgs.GetValue("--stall-timeout"),
+                config,
+                out var retryError,
+                out var maxRetries,
+                out var maxSectorReads,
+                out var stallTimeoutSeconds))
+        {
+            Console.Error.WriteLine(retryError);
+            return 1;
+        }
+
         var drive = context.ResolveDrive();
         var offset = config.GetReadOffset(drive?.Vendor, drive?.Model, drive?.Release) ?? 0;
         var overread = parsedArgs.HasFlag("--overread") || config.GetOverread(drive?.Vendor, drive?.Model, drive?.Release);
@@ -105,7 +125,18 @@ internal static class RipCommand
         var accurateRipClient = new AccurateRipClient(httpClientFactory.CreateClient("accuraterip"));
         var runner = new WhatinatorRipRunner(accurateRipClient);
         var options = new WhatinatorRipOptions(
-            device, releaseInfo, toc, dest, DiscNumber: discNumber, Offset: offset, Overread: overread, KeepWav: keepWav);
+            device,
+            releaseInfo,
+            toc,
+            dest,
+            DiscNumber: discNumber,
+            Offset: offset,
+            Overread: overread,
+            KeepWav: keepWav,
+            MaxRetries: maxRetries,
+            Verify: !noVerify,
+            MaxSectorReads: maxSectorReads,
+            StallTimeoutSeconds: stallTimeoutSeconds);
 
         WhatinatorRipResult result;
 
@@ -152,7 +183,8 @@ internal static class RipCommand
                 environment.Uname,
                 environment.OsPrettyName,
                 startTime,
-                endTime);
+                endTime,
+                !noVerify);
             var releaseDisplayName = ReleaseFolderNaming.ReleaseDisplayName(releaseInfo);
             WhatinatorEacLog.Write(logOptions, Path.Combine(dest, releaseDisplayName + ".log"));
         }

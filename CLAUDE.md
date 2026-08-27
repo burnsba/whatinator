@@ -217,9 +217,39 @@ including `AccurateRipClientTests`' captured live database response.
   reading the last few hundred sectors of the final track -- the identical
   span without `--force-overread` completed in seconds, but with it added,
   cd-paranoia neither completed nor errored after 10+ minutes and had to be
-  killed. It doesn't fail fast, so don't assume a hang is something else. This
-  is exactly why `--overread`/`WhatinatorConfig.Overreads` are opt-in rather
-  than defaulted on -- see backlog 044.
+  killed. It doesn't fail fast, so don't assume a hang is something else.
+  Reproduced twice more directly against the same drive/disc while
+  investigating backlog-completed 050: `--force-overread` combined with a
+  small but *positive* sample offset (`+6`), reading the disc's **last**
+  track, hangs every time; the identical command with `--force-overread`
+  dropped succeeds in under a second, every time. Captured output during a
+  hang shows it isn't blocked on the drive (not an uninterruptible I/O wait)
+  -- it's a tight user-space spin emitting `##: 6 [skip] @ 0` over 1000
+  times/second forever, i.e. cd-paranoia's own overread-boundary arithmetic
+  has produced a bogus word-offset of `0` and it never detects that and
+  bails out. That combination -- read past the official end of the disc,
+  positive offset, right at the lead-out -- is exactly what upstream's own
+  man page warns can cause "read errors on most drives and possibly even
+  hard lockups on some buggy hardware," so treat this as: the *feature*
+  legitimately asks a drive to do something outside its guaranteed contract
+  (firmware-dependent whether that's honored, refused, or mishandled), but
+  the *infinite silent spin with zero forward progress* is squarely
+  cd-paranoia's own robustness gap -- a well-behaved client would detect a
+  bad computed position and fail instead of looping on it forever. This is
+  exactly why `--overread`/`WhatinatorConfig.Overreads` are opt-in rather
+  than defaulted on -- see backlog 044 -- and why `--overread` is only worth
+  turning on when the configured read offset is large enough that skipping
+  the very edge of the disc would lose meaningful audio (see
+  `CdParanoiaTrackReader.MaxSafeOffsetSamples`, 587 samples); a small offset
+  like `+6` has essentially nothing to gain from it. `rip`/`pipeline
+  --stall-timeout` (`CdParanoiaTrackOptions.StallTimeoutSeconds`,
+  `StallMonitor`) is the general mitigation for exactly this class of hang:
+  it kills a single cd-paranoia invocation once it reports no forward
+  progress for that long, rather than waiting on it forever -- see
+  backlog-completed 050. `--max-sector-reads`/`--never-skip` does **not**
+  help here -- that caps how many times cd-paranoia retries a sector it
+  recognizes as bad, but this spin never increments that counter at all;
+  it's a different code path.
 - Subprocess stdout/stderr are drained through `ProcessOutputRelay` while the
   process runs. Don't switch to a `WaitForExit()`-then-read shape -- that
   deadlocks on tools that fill the pipe buffer, which `cd-paranoia` will.

@@ -31,8 +31,29 @@ public class CdParanoiaTrackReaderTests
         var args = CdParanoiaTrackReader.BuildStartInfo(options, "/tmp/out/scratch.wav").ArgumentList;
 
         Assert.Equal(
-            ["--stderr-progress", "--sample-offset=6", "--force-cdrom-device", "/dev/sr1", "1[00:00:00.00]-1[00:00:05.00]", "/tmp/out/scratch.wav"],
+            ["--stderr-progress", "--sample-offset=6", "--never-skip=12", "--force-cdrom-device", "/dev/sr1", "1[00:00:00.00]-1[00:00:05.00]", "/tmp/out/scratch.wav"],
             args);
+    }
+
+    [Fact]
+    public void BuildStartInfo_PassesNeverSkipWithCount_ByDefault()
+    {
+        var options = new CdParanoiaTrackOptions("/dev/sr1", SingleTrackToc, 1, "/tmp/out/track01.wav");
+
+        var args = CdParanoiaTrackReader.BuildStartInfo(options, "/tmp/out/scratch.wav").ArgumentList;
+
+        Assert.Contains("--never-skip=12", args);
+    }
+
+    [Fact]
+    public void BuildStartInfo_PassesBareNeverSkip_WhenMaxSectorReadsIsZero()
+    {
+        var options = new CdParanoiaTrackOptions("/dev/sr1", SingleTrackToc, 1, "/tmp/out/track01.wav", MaxSectorReads: 0);
+
+        var args = CdParanoiaTrackReader.BuildStartInfo(options, "/tmp/out/scratch.wav").ArgumentList;
+
+        Assert.Contains("--never-skip", args);
+        Assert.DoesNotContain(args, a => a.StartsWith("--never-skip=", StringComparison.Ordinal));
     }
 
     [Fact]

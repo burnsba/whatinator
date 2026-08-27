@@ -27,6 +27,16 @@ namespace Whatinator.Core.Rip;
 /// <param name="OsPrettyName">The OS's <c>PRETTY_NAME</c>, from <see cref="SystemInfo.GetOsPrettyName"/>.</param>
 /// <param name="StartTime">When the rip started -- also the log's own dated header line.</param>
 /// <param name="EndTime">When the rip finished.</param>
+/// <param name="Verify">
+/// Whether the rip performed the test/copy double-read and CRC32 compare
+/// (matches <see cref="WhatinatorRipOptions.Verify"/>). Governs the header's
+/// <c>Read mode</c> line (<c>Secure</c> vs. EAC's own <c>Burst</c> term for
+/// single-pass) and whether each track's <c>Test CRC</c> line reports a real
+/// value or that verification was skipped -- see
+/// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>.
+/// Default <see langword="true"/> matches this project's prior always-Secure
+/// behavior.
+/// </param>
 public sealed record EacLogOptions(
     ReleaseInfo ReleaseInfo,
     WhatinatorRipResult RipResult,
@@ -45,4 +55,5 @@ public sealed record EacLogOptions(
     string Uname,
     string? OsPrettyName,
     DateTimeOffset StartTime,
-    DateTimeOffset EndTime);
+    DateTimeOffset EndTime,
+    bool Verify = true);

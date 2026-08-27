@@ -17,7 +17,15 @@ namespace Whatinator.Core.Rip;
 /// (<see cref="AccurateRipClient"/>). On a mismatch, retries the whole
 /// two-read cycle up to <see cref="CdParanoiaTrackOptions.MaxRetries"/>
 /// times before giving up on the
-/// track -- see <see cref="CdParanoiaTrackResult.Degraded"/>.
+/// track -- see <see cref="CdParanoiaTrackResult.Degraded"/>. When
+/// <see cref="CdParanoiaTrackOptions.Verify"/> is <see langword="false"/>,
+/// only the single-pass "fast" read runs -- no copy read, no CRC compare
+/// -- and a size check is the sole local verification (see
+/// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>).
+/// Either way, <see cref="CdParanoiaTrackOptions.MaxSectorReads"/> and
+/// <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/> bound how long
+/// any one cd-paranoia invocation can spend stuck on a single sector or a
+/// hung process respectively.
 /// </summary>
 public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
 {
@@ -280,6 +288,15 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
             startInfo.ArgumentList.Add("--force-overread");
         }
 
+        // --never-skip[=n] is cd-paranoia's own per-sector retry cap (n=0
+        // requests the bare flag, which means "retry forever" -- see man
+        // cd-paranoia). Passed unconditionally, in both Verify modes: a
+        // sane per-sector bound is a safety net, not something whatinator
+        // ever wants left to cd-paranoia's own unflagged default of ~20 (see
+        // root CLAUDE.md's --force-overread hang gotcha for why that default
+        // wasn't enough to stop a rip running all night on one sector).
+        startInfo.ArgumentList.Add(options.MaxSectorReads == 0 ? "--never-skip" : $"--never-skip={options.MaxSectorReads}");
+
         startInfo.ArgumentList.Add("--force-cdrom-device");
         startInfo.ArgumentList.Add(options.Device);
         startInfo.ArgumentList.Add(
@@ -345,9 +362,20 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
     /// </summary>
     /// <param name="options">The track read options.</param>
     /// <param name="outputPath">The WAV path cd-paranoia should write to.</param>
-    /// <param name="renderer">The progress reporter to feed this invocation's <c>##:</c>/other output to -- also this invocation's only output destination (see <see cref="TeeRelayLinesAsync"/>).</param>
+    /// <param name="renderer">
+    /// The progress reporter to feed this invocation's <c>##:</c>/other
+    /// output to -- also this invocation's only output destination (see
+    /// <see cref="TeeRelayLinesAsync"/>) and, when <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>
+    /// is nonzero, the source of the stall check itself (see <see cref="StallMonitor"/>).
+    /// </param>
     /// <param name="cancellationToken">A token to cancel the read.</param>
-    /// <returns>The process's exit code and its captured stderr text.</returns>
+    /// <returns>
+    /// The process's exit code and its captured stderr text. A stalled
+    /// invocation (see <see cref="CdParanoiaTrackOptions.StallTimeoutSeconds"/>)
+    /// is reported as exit code <c>-1</c> rather than throwing, so callers
+    /// treat it exactly like any other failed attempt -- see
+    /// <see cref="TryOnceAsync"/>.
+    /// </returns>
     internal static async Task<(int ExitCode, string CapturedStandardError)> RunCdParanoiaAsync(
         CdParanoiaTrackOptions options,
         string outputPath,
@@ -355,20 +383,49 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         CancellationToken cancellationToken)
     {
         var captured = new StringBuilder();
-        var exitCode = await SubprocessRunner.RunAsync(
-            BuildStartInfo(options, outputPath),
-            (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
-            (reader, ct) => TeeRelayLinesAsync(reader, captured, renderer, ct),
-            cancellationToken).ConfigureAwait(false);
+
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var stallMonitor = options.StallTimeoutSeconds > 0
+            ? new StallMonitor(renderer, TimeSpan.FromSeconds(options.StallTimeoutSeconds), linkedCts)
+            : null;
+
+        int exitCode;
+        try
+        {
+            exitCode = await SubprocessRunner.RunAsync(
+                BuildStartInfo(options, outputPath),
+                (reader, ct) => reader.BaseStream.CopyToAsync(Stream.Null, ct),
+                (reader, ct) => TeeRelayLinesAsync(reader, captured, renderer, ct),
+                linkedCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // linkedCts fired but the caller's own token didn't -- this was
+            // StallMonitor giving up on this invocation, not a real Ctrl-C.
+            // The process has already been killed by SubprocessRunner's
+            // kill-on-cancel; report a failure rather than rethrowing so the
+            // existing MaxRetries cycle (and eventual Degraded/warn-and-
+            // continue path) handles it like any other failed read.
+            renderer.RelayLine($"Warning: no read progress for {options.StallTimeoutSeconds}s -- aborting this attempt.");
+            return (-1, captured.ToString());
+        }
 
         return (exitCode, captured.ToString());
     }
 
-    /// <summary>Runs one test+copy cd-paranoia cycle for <paramref name="track"/>, cleaning up its scratch files regardless of outcome.</summary>
+    /// <summary>
+    /// Runs one cd-paranoia read cycle for <paramref name="track"/>,
+    /// cleaning up its scratch files regardless of outcome -- a test+copy
+    /// double read with a CRC32 compare when <see cref="CdParanoiaTrackOptions.Verify"/>
+    /// is <see langword="true"/> (the default), or a single read when it's
+    /// <see langword="false"/> (single-pass/"fast" mode -- see
+    /// <c>docs/backlog-completed/050-eac-gap-extraction-mode-and-retry-control.md</c>).
+    /// </summary>
     /// <returns>
-    /// The accepted read's CRC32/peak/quality plus the test read's own
+    /// The accepted read's CRC32/peak/quality plus that read's own
     /// wall-clock time (<c>TestReadElapsed</c> below), or
-    /// <see langword="null"/> on a size failure or CRC32 mismatch.
+    /// <see langword="null"/> on a size failure or (verified mode only) a
+    /// CRC32 mismatch.
     /// </returns>
     private static async Task<(uint Crc32, int? Peak, double? Quality, TimeSpan TestReadElapsed)?> TryOnceAsync(
         CdParanoiaTrackOptions options,
@@ -379,18 +436,18 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
         CancellationToken cancellationToken)
     {
         var testPath = Path.Combine(destinationDir, $"whatinator-{Guid.NewGuid():N}-test.wav");
-        var copyPath = Path.Combine(destinationDir, $"whatinator-{Guid.NewGuid():N}-copy.wav");
+        var copyPath = options.Verify ? Path.Combine(destinationDir, $"whatinator-{Guid.NewGuid():N}-copy.wav") : null;
         var stopOffset = track.EndFrame - track.StartFrame;
 
         try
         {
-            renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 1, totalReads: 2);
+            renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 1, totalReads: options.Verify ? 2 : 1);
 
-            // Timed around the test read only, not the copy read or sox
-            // below -- see CdParanoiaTrackResult.ElapsedTime for why: this
-            // is meant to read as EAC's "Extraction speed" (single-read
-            // drive speed), not the wall-clock cost of the whole verify
-            // cycle.
+            // Timed around this first (and, in fast mode, only) read alone,
+            // not the copy read or sox below -- see
+            // CdParanoiaTrackResult.ElapsedTime for why: this is meant to
+            // read as EAC's "Extraction speed" (single-read drive speed),
+            // not the wall-clock cost of the whole verify cycle.
             var testReadStopwatch = Stopwatch.StartNew();
             var testRun = await RunCdParanoiaAsync(options, testPath, renderer, cancellationToken).ConfigureAwait(false);
             testReadStopwatch.Stop();
@@ -400,26 +457,40 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
                 return null;
             }
 
-            renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 2, totalReads: 2);
-            var copyRun = await RunCdParanoiaAsync(options, copyPath, renderer, cancellationToken).ConfigureAwait(false);
-            renderer.Complete();
-            if (copyRun.ExitCode != 0 || !IsExpectedSize(track, copyPath))
+            uint crc;
+            if (options.Verify)
             {
-                return null;
-            }
+                renderer.BeginRead(stopOffset, startFrame: track.StartFrame, readNumber: 2, totalReads: 2);
+                var copyRun = await RunCdParanoiaAsync(options, copyPath!, renderer, cancellationToken).ConfigureAwait(false);
+                renderer.Complete();
+                if (copyRun.ExitCode != 0 || !IsExpectedSize(track, copyPath!))
+                {
+                    return null;
+                }
 
-            var testCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(testPath));
-            var copyCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(copyPath));
-            if (testCrc != copyCrc)
+                var testCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(testPath));
+                var copyCrc = Crc32.HashToUInt32(WavFile.ReadDataChunk(copyPath!));
+                if (testCrc != copyCrc)
+                {
+                    return null;
+                }
+
+                crc = testCrc;
+            }
+            else
             {
-                return null;
+                // No independent second read to compare against -- the size
+                // check above is this mode's only local verification.
+                // AccurateRip's whole-disc lookup (WhatinatorRipRunner,
+                // after every track is read) remains unaffected either way.
+                crc = Crc32.HashToUInt32(WavFile.ReadDataChunk(testPath));
             }
 
             var peak = await TryGetPeakLevelAsync(testPath, cancellationToken).ConfigureAwait(false);
             var quality = ComputeQuality(testRun.CapturedStandardError, 0, stopOffset, track.StartFrame);
 
             File.Move(testPath, destinationPath, overwrite: true);
-            return (testCrc, peak, quality, testReadStopwatch.Elapsed);
+            return (crc, peak, quality, testReadStopwatch.Elapsed);
         }
         finally
         {
@@ -428,7 +499,7 @@ public sealed class CdParanoiaTrackReader : ICdParanoiaTrackReader
                 File.Delete(testPath);
             }
 
-            if (File.Exists(copyPath))
+            if (copyPath is not null && File.Exists(copyPath))
             {
                 File.Delete(copyPath);
             }

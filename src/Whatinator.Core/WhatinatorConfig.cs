@@ -48,13 +48,30 @@ namespace Whatinator.Core;
 /// manually verified. <c>rip</c>/<c>pipeline</c>'s <c>--overread</c> flag
 /// forces it on for a single run regardless of this map.
 /// </param>
+/// <param name="MaxSectorReads">
+/// The default per-sector retry cap passed to cd-paranoia's <c>--never-skip</c>
+/// (see <see cref="Rip.CdParanoiaTrackOptions.MaxSectorReads"/>), used when
+/// <c>rip</c>/<c>pipeline</c>'s <c>--max-sector-reads</c> isn't given.
+/// <see langword="null"/> means the CLI's own hardcoded default (12)
+/// applies. Not drive-keyed, unlike <see cref="ReadOffsets"/>/<see cref="Overreads"/> --
+/// this is a read-robustness preference, not a physical drive property.
+/// </param>
+/// <param name="StallTimeoutSeconds">
+/// The default stall timeout in seconds (see
+/// <see cref="Rip.CdParanoiaTrackOptions.StallTimeoutSeconds"/>), used when
+/// <c>rip</c>/<c>pipeline</c>'s <c>--stall-timeout</c> isn't given.
+/// <see langword="null"/> means the CLI's own hardcoded default (1200)
+/// applies.
+/// </param>
 public sealed record WhatinatorConfig(
     string Device = "/dev/sr1",
     bool MakeMp3 = true,
     string? UserAgent = null,
     IReadOnlyDictionary<string, int>? ReadOffsets = null,
     IReadOnlyDictionary<string, CacheDefeatResult>? CacheDefeats = null,
-    IReadOnlyDictionary<string, bool>? Overreads = null)
+    IReadOnlyDictionary<string, bool>? Overreads = null,
+    int? MaxSectorReads = null,
+    int? StallTimeoutSeconds = null)
 {
     /// <summary>
     /// The HTTP <c>User-Agent</c> to send with outbound requests: the
