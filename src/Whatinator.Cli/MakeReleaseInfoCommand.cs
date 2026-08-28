@@ -114,12 +114,14 @@ internal static class MakeReleaseInfoCommand
         bool discIdMatched;
         try
         {
+            Console.WriteLine($"Looking up disc ID {disc.Id} on MusicBrainz...");
             var result = await service.LookupByDiscIdAsync(disc.Id, cancellationToken).ConfigureAwait(false);
             switch (result.Status)
             {
                 case MetadataLookupStatus.Found:
                     releaseInfo = result.ReleaseInfo!;
                     discIdMatched = true;
+                    Console.WriteLine($"Found unique MusicBrainz match: {DescribeReleaseInfo(releaseInfo)}");
                     break;
                 case MetadataLookupStatus.Ambiguous:
                     var ambiguousResolution = await ResolveAmbiguousMusicBrainzMatchAsync(disc, service, result.Candidates!, cancellationToken).ConfigureAwait(false);
@@ -318,6 +320,7 @@ internal static class MakeReleaseInfoCommand
     /// <returns>The resolved release; <see langword="null"/> (with an error already printed) if its track count doesn't match.</returns>
     private static async Task<ReleaseInfo?> ResolveAndValidateTrackCountAsync(MetadataService service, string releaseId, int expectedTrackCount, CancellationToken cancellationToken)
     {
+        Console.WriteLine($"Fetching release {releaseId} from MusicBrainz...");
         var releaseInfo = await service.ResolveAsync(releaseId, cancellationToken).ConfigureAwait(false);
         if (!releaseInfo.Media.Any(medium => medium.Tracks.Count == expectedTrackCount))
         {
@@ -386,6 +389,7 @@ internal static class MakeReleaseInfoCommand
         IReadOnlyList<DiscogsInfo> candidates;
         try
         {
+            Console.WriteLine($"Looking up Discogs release by barcode {releaseInfo.Barcode}...");
             candidates = await discogsClient.SearchByBarcodeAsync(releaseInfo.Barcode, cancellationToken).ConfigureAwait(false);
         }
         catch (DiscogsException ex)
@@ -394,18 +398,26 @@ internal static class MakeReleaseInfoCommand
             return releaseInfo;
         }
 
-        DiscogsInfo? chosen = candidates.Count switch
+        DiscogsInfo? chosen;
+        if (candidates.Count == 1)
         {
-            0 => null,
-            1 => candidates[0],
-            _ => await ConsolePicker.PromptForSelectionAsync(
-                $"Found {candidates.Count} matching Discogs releases:",
-                candidates,
-                DescribeDiscogsCandidate,
-                allowSkip: true,
-                manualOverride: ct => PromptManualDiscogsOverrideAsync(discogsClient, ct),
-                cancellationToken: cancellationToken).ConfigureAwait(false),
-        };
+            chosen = candidates[0];
+            Console.WriteLine($"Found unique Discogs match: {DescribeDiscogsCandidate(chosen)}");
+        }
+        else
+        {
+            chosen = candidates.Count switch
+            {
+                0 => null,
+                _ => await ConsolePicker.PromptForSelectionAsync(
+                    $"Found {candidates.Count} matching Discogs releases:",
+                    candidates,
+                    DescribeDiscogsCandidate,
+                    allowSkip: true,
+                    manualOverride: ct => PromptManualDiscogsOverrideAsync(discogsClient, ct),
+                    cancellationToken: cancellationToken).ConfigureAwait(false),
+            };
+        }
 
         return chosen is null ? releaseInfo : releaseInfo with { Discogs = chosen };
     }
@@ -439,6 +451,7 @@ internal static class MakeReleaseInfoCommand
 
         try
         {
+            Console.WriteLine($"Fetching Discogs release {releaseId}...");
             return await discogsClient.GetReleaseAsync(releaseId, cancellationToken).ConfigureAwait(false);
         }
         catch (DiscogsException ex)
@@ -461,6 +474,12 @@ internal static class MakeReleaseInfoCommand
     /// <returns>The description.</returns>
     private static string DescribeMusicBrainzCandidate(ReleaseCandidate candidate) =>
         $"{candidate.Artist} - {candidate.Title} ({candidate.Date ?? "?"}, {candidate.Country ?? "?"}) cat={candidate.CatalogNumber ?? "?"} barcode={candidate.Barcode ?? "?"}";
+
+    /// <summary>Formats one line describing a resolved release, for the "found unique match" status line.</summary>
+    /// <param name="releaseInfo">The resolved release to describe.</param>
+    /// <returns>The description, in the same style as <see cref="DescribeMusicBrainzCandidate"/>.</returns>
+    private static string DescribeReleaseInfo(ReleaseInfo releaseInfo) =>
+        $"{releaseInfo.Artist} - {releaseInfo.Title} ({releaseInfo.Date ?? "?"}, {releaseInfo.Country ?? "?"}) cat={releaseInfo.CatalogNumber ?? "?"} barcode={releaseInfo.Barcode ?? "?"}";
 
     /// <summary>Formats one line describing a Discogs candidate for the picker.</summary>
     /// <param name="candidate">The candidate to describe.</param>
