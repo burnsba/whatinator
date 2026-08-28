@@ -138,6 +138,32 @@ public class MakeReleaseInfoCommandTests
     }
 
     [Fact]
+    public async Task ResolveAmbiguousMusicBrainzMatchAsync_MultiDiscRelease_MatchesAgainstOneMediumNotTheSum()
+    {
+        // Reproduces a real report: "To Venus and Back" is 2 discs (13 + 11
+        // tracks). Identifying disc 2 alone (11 audio tracks) must not be
+        // compared against the release's 24-track sum -- it should match
+        // because *some* medium (disc 2) has 11 tracks.
+        var disc = CreateDisc(trackCount: 11);
+        var candidates = new[] { CreateCandidate("release-1") };
+        var client = new FakeMusicBrainzClient(_ => CreateMultiDiscReleaseInfo("release-1", trackCounts: [13, 11]));
+        var service = new MetadataService(client);
+
+        var (originalIn, originalOut) = RedirectConsole("1\n");
+        try
+        {
+            var result = await MakeReleaseInfoCommand.ResolveAmbiguousMusicBrainzMatchAsync(disc, service, candidates, CancellationToken.None, isOutputRedirected: false);
+
+            Assert.NotNull(result);
+            Assert.Equal("release-1", result.Value.ReleaseInfo.MusicBrainzReleaseId);
+        }
+        finally
+        {
+            RestoreConsole(originalIn, originalOut);
+        }
+    }
+
+    [Fact]
     public async Task ResolveManualOnlyMusicBrainzMatchAsync_TrackCountMismatchThenMatch_RetriesUntilItMatches()
     {
         var disc = CreateDisc(trackCount: 9);
@@ -197,6 +223,27 @@ public class MakeReleaseInfoCommandTests
             Label: null,
             CatalogNumber: null,
             Media: [new MediumInfo(1, null, tracks)]);
+    }
+
+    private static ReleaseInfo CreateMultiDiscReleaseInfo(string musicBrainzReleaseId, params int[] trackCounts)
+    {
+        var media = trackCounts
+            .Select((count, index) => new MediumInfo(
+                index + 1,
+                null,
+                Enumerable.Range(1, count).Select(number => new TrackInfo(number, $"Track {number}", "Some Artist", TimeSpan.FromMinutes(3))).ToList()))
+            .ToList();
+        return new ReleaseInfo(
+            MusicBrainzReleaseId: musicBrainzReleaseId,
+            MusicBrainzUrl: $"https://musicbrainz.org/release/{musicBrainzReleaseId}",
+            Artist: "Some Artist",
+            Title: "Some Title",
+            Date: null,
+            Country: null,
+            Barcode: null,
+            Label: null,
+            CatalogNumber: null,
+            Media: media);
     }
 
     private static (TextReader OriginalIn, TextWriter OriginalOut) RedirectConsole(string input)

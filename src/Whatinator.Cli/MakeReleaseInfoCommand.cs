@@ -299,7 +299,18 @@ internal static class MakeReleaseInfoCommand
         return true;
     }
 
-    /// <summary>Fetches a release's full metadata and checks its track count against the disc before accepting it.</summary>
+    /// <summary>
+    /// Fetches a release's full metadata and checks its track count against
+    /// the disc before accepting it. For a single-disc release that means the
+    /// release's one medium; for a multi-disc release, this identification
+    /// step only ever has one physical disc in the drive (see root
+    /// <c>CLAUDE.md</c> § "The two disc models"), so it accepts the release
+    /// as long as <em>some</em> medium's track count matches -- summing
+    /// across every medium would compare this one disc against the whole
+    /// release's total and always fail. Which medium actually corresponds to
+    /// this disc is resolved positionally later, by <c>--multi</c>/the
+    /// pipeline's disc loop, not here.
+    /// </summary>
     /// <param name="service">The MusicBrainz metadata service to resolve through.</param>
     /// <param name="releaseId">The MusicBrainz release MBID to resolve.</param>
     /// <param name="expectedTrackCount">The disc's actual audio track count.</param>
@@ -308,11 +319,11 @@ internal static class MakeReleaseInfoCommand
     private static async Task<ReleaseInfo?> ResolveAndValidateTrackCountAsync(MetadataService service, string releaseId, int expectedTrackCount, CancellationToken cancellationToken)
     {
         var releaseInfo = await service.ResolveAsync(releaseId, cancellationToken).ConfigureAwait(false);
-        var actualTrackCount = releaseInfo.Media.Sum(medium => medium.Tracks.Count);
-        if (actualTrackCount != expectedTrackCount)
+        if (!releaseInfo.Media.Any(medium => medium.Tracks.Count == expectedTrackCount))
         {
+            var trackCounts = string.Join(", ", releaseInfo.Media.Select(medium => medium.Tracks.Count));
             Console.Error.WriteLine(
-                $"'{releaseInfo.Artist} - {releaseInfo.Title}' has {actualTrackCount} track(s), but this disc has {expectedTrackCount} audio track(s) -- pick a different release.");
+                $"'{releaseInfo.Artist} - {releaseInfo.Title}' has {releaseInfo.Media.Count} disc(s) with {trackCounts} track(s), but this disc has {expectedTrackCount} audio track(s) -- pick a different release.");
             return null;
         }
 

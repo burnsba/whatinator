@@ -226,8 +226,11 @@ Discogs release (by barcode), and write `{dest}/releaseinfo.json` either way
 changes where its content comes from. Multiple matches (MusicBrainz or
 Discogs) prompt for a selection on stdin (the Discogs prompt includes a skip
 option); either picker also offers `m` to manually paste a
-MusicBrainz/Discogs release URL instead, and a manual MusicBrainz override is
-rejected (prompting again) if its track count doesn't match the disc's. Zero
+MusicBrainz/Discogs release URL instead, and any MusicBrainz pick -- numbered
+or manual override -- is rejected (prompting again) unless some disc of the
+release has a track count matching this physical disc's (for a multi-disc
+release, this identification step only ever has one physical disc in the
+drive, so it checks each medium rather than the release's track total). Zero
 MusicBrainz matches prints the disc's known TOC info, then offers the same
 manual-URL prompt (no numbered candidates to pick from) before giving up --
 exits 1, no file written, only if that's also declined (blank input/EOF).
